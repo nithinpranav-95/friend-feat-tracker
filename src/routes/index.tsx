@@ -78,18 +78,7 @@ const animals: Record<string, string> = {
   octopus: "🐙",
   turtle: "🐢",
 };
-const demoPlayers: Player[] = [
-  { id: "p1", display_name: "Alex", spirit_animal: "fox" },
-  { id: "p2", display_name: "Sam", spirit_animal: "owl" },
-  { id: "p3", display_name: "Jordan", spirit_animal: "frog" },
-  { id: "p4", display_name: "Taylor", spirit_animal: "bear" },
-  { id: "p5", display_name: "Morgan", spirit_animal: "tiger" },
-  { id: "p6", display_name: "Casey", spirit_animal: "panda" },
-  { id: "p7", display_name: "Riley", spirit_animal: "octopus" },
-  { id: "p8", display_name: "Jamie", spirit_animal: "turtle" },
-  { id: "p9", display_name: "Quinn", spirit_animal: "fox" },
-  { id: "p10", display_name: "Avery", spirit_animal: "owl" },
-];
+const demoPlayers: Player[] = [];
 const demoGames: Game[] = [
   { id: "sevens", name: "Sevens", scoring_type: "points", high_score_wins: false, accent: "lime" },
   { id: "poker", name: "Poker", scoring_type: "points", high_score_wins: true, accent: "yellow" },
@@ -105,6 +94,7 @@ function GameApp() {
   const [games, setGames] = useState<Game[]>(demoGames);
   const [players, setPlayers] = useState<Player[]>(demoPlayers);
   const [setupGame, setSetupGame] = useState<Game | null>(null);
+  const [pendingGame, setPendingGame] = useState<Game | null>(null);
   const [liveGame, setLiveGame] = useState<Game | null>(null);
   const [livePlayers, setLivePlayers] = useState<LivePlayer[]>([]);
   const [round, setRound] = useState(1);
@@ -120,7 +110,11 @@ function GameApp() {
       const savedPlayers = localStorage.getItem("scoreup_players");
       if (savedPlayers) {
         const parsed = JSON.parse(savedPlayers);
-        if (Array.isArray(parsed) && parsed.length > 0) setPlayers(parsed);
+        if (Array.isArray(parsed)) {
+          // Remove any preset players from previous version
+          const userOnly = parsed.filter((p: Player) => !p.id.startsWith("p"));
+          setPlayers(userOnly);
+        }
       }
       const savedGames = localStorage.getItem("scoreup_games");
       if (savedGames) {
@@ -163,6 +157,7 @@ function GameApp() {
 
   function handleSelectGame(game: Game) {
     if (players.length === 0) {
+      setPendingGame(game);
       setAddPlayer(true);
       return;
     }
@@ -292,10 +287,7 @@ function GameApp() {
           players={players}
           close={() => setSetupGame(null)}
           start={startSessionWithPlayers}
-          openAddPlayer={() => {
-            setSetupGame(null);
-            setAddPlayer(true);
-          }}
+          openAddPlayer={() => setAddPlayer(true)}
         />
       )}
       {newGame && (
@@ -318,13 +310,22 @@ function GameApp() {
       )}
       {addPlayer && (
         <AddPlayerModal
-          close={() => setAddPlayer(false)}
-          save={(name: string, animal: string) => {
-            setPlayers([
-              ...players,
-              { id: crypto.randomUUID(), display_name: name, spirit_animal: animal },
-            ]);
+          close={() => {
             setAddPlayer(false);
+            setPendingGame(null);
+          }}
+          save={(name: string, animal: string) => {
+            const newP = {
+              id: crypto.randomUUID(),
+              display_name: name,
+              spirit_animal: animal,
+            };
+            setPlayers([...players, newP]);
+            setAddPlayer(false);
+            if (pendingGame) {
+              setSetupGame(pendingGame);
+              setPendingGame(null);
+            }
           }}
         />
       )}
@@ -547,34 +548,70 @@ function PlayView({
       </section>
       <section className="mt-10">
         <div className="flex items-center justify-between">
-          <h2 className="font-heading text-3xl font-bold">The squad</h2>
-          <button onClick={openAddPlayer} className="font-bold text-primary">
-            + Add player
-          </button>
-        </div>
-        <div className="mt-5 flex gap-4 overflow-x-auto pb-2">
-          {players.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => openPlayer(p.id)}
-              className="min-w-32 rounded-2xl border border-border bg-card p-4 text-center transition hover:border-primary"
-            >
-              <span className="animal-bob inline-block text-4xl">
-                {animals[p.spirit_animal] ?? "🦊"}
-              </span>
-              <p className="mt-2 font-heading text-lg font-bold">{p.display_name}</p>
-              <p className="text-xs text-muted-foreground">Tap profile</p>
-            </button>
-          ))}
-          <button
+          <div>
+            <h2 className="font-heading text-3xl font-bold">The squad</h2>
+            <p className="text-sm text-muted-foreground">
+              {players.length === 0
+                ? "No players yet — add friends when you're ready to play"
+                : `${players.length} friend${players.length === 1 ? "" : "s"} ready for game night`}
+            </p>
+          </div>
+          <Button
             onClick={openAddPlayer}
-            className="min-w-32 rounded-2xl border border-dashed border-muted-foreground bg-card p-4 text-center"
+            variant="outline"
+            className="rounded-xl border-primary/40 text-primary hover:bg-primary/10 font-bold"
           >
-            <span className="inline-block text-4xl">➕</span>
-            <p className="mt-2 font-heading text-lg font-bold">Add name</p>
-            <p className="text-xs text-muted-foreground">Join the squad</p>
-          </button>
+            <Plus className="mr-1.5 size-4" /> Add player
+          </Button>
         </div>
+
+        {players.length === 0 ? (
+          <div className="mt-5 flex flex-col items-center justify-center rounded-[1.5rem] border border-dashed border-border bg-card/60 p-8 text-center">
+            <span className="text-4xl">👋</span>
+            <h3 className="mt-3 font-heading text-xl font-bold">No players in the squad</h3>
+            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+              Add your friends' names and spirit animals when you are ready to play.
+            </p>
+            <Button
+              onClick={openAddPlayer}
+              className="mt-5 h-12 rounded-xl bg-primary px-6 font-bold text-primary-foreground shadow-md hover:brightness-105"
+            >
+              <Plus className="mr-1.5 size-4" /> Add your first player
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-5 space-y-2.5">
+            {players.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => openPlayer(p.id)}
+                className="flex w-full items-center justify-between rounded-2xl border border-border bg-card p-3.5 text-left transition hover:-translate-y-0.5 hover:border-primary hover:bg-secondary/40"
+              >
+                <div className="flex items-center gap-3.5">
+                  <span className="animal-bob inline-block text-3xl">
+                    {animals[p.spirit_animal] ?? "🦊"}
+                  </span>
+                  <div>
+                    <p className="font-heading text-lg font-bold text-foreground">
+                      {p.display_name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Spirit animal: {p.spirit_animal} · Tap to view profile
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-primary">View profile →</span>
+              </button>
+            ))}
+
+            <button
+              onClick={openAddPlayer}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-muted-foreground/30 bg-card/40 p-3.5 text-center font-bold text-primary transition hover:border-primary hover:bg-secondary/60"
+            >
+              <Plus className="size-4" /> Add another player
+            </button>
+          </div>
+        )}
       </section>
     </>
   );
@@ -597,6 +634,20 @@ function GameSetupModal({
     const initialCount = players.length >= 10 ? 5 : players.length;
     return new Set(players.slice(0, initialCount).map((p) => p.id));
   });
+
+  // Auto-select newly added players if squad grows
+  const [knownIds, setKnownIds] = useState<Set<string>>(() => new Set(players.map((p) => p.id)));
+  useEffect(() => {
+    const newPlayers = players.filter((p) => !knownIds.has(p.id));
+    if (newPlayers.length > 0) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        newPlayers.forEach((p) => next.add(p.id));
+        return next;
+      });
+      setKnownIds(new Set(players.map((p) => p.id)));
+    }
+  }, [players, knownIds]);
 
   function togglePlayer(id: string) {
     setSelectedIds((prev) => {
