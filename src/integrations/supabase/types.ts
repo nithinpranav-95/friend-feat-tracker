@@ -275,11 +275,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      bootstrap_group: { Args: { _name: string }; Returns: string }
-      is_group_member: {
-        Args: { _group_id: string; _user_id?: string }
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
       scoring_type: "points" | "win_loss" | "ranked"
