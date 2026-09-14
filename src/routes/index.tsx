@@ -97,7 +97,7 @@ function GameApp({ user }: { user: User }) {
   const [groupId, setGroupId] = useState<string | null>(null);
   const [games, setGames] = useState<Game[]>(demoGames);
   const [players, setPlayers] = useState<Player[]>(demoPlayers);
-  const [setupName, setSetupName] = useState(user.user_metadata?.full_name ?? "");
+  const [setupName, setSetupName] = useState(String(user.user_metadata?.["full_name"] ?? ""));
   const [setupAnimal, setSetupAnimal] = useState("fox");
   const [setupGroup, setSetupGroup] = useState("Friday Night Crew");
   const [setup, setSetup] = useState(true);
@@ -158,7 +158,7 @@ function GameApp({ user }: { user: User }) {
       {tab === "history" && <HistoryView />}
     </main>
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 backdrop-blur"><div className="mx-auto flex max-w-xl justify-around px-3 py-2">{nav.map((item) => <button key={item.id} onClick={() => setTab(item.id)} className={`flex min-w-16 flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold ${tab === item.id ? "text-primary" : "text-muted-foreground"}`}><item.icon className="size-6" />{item.label}</button>)}</div></nav>
-    {newGame && <NewGameModal close={() => setNewGame(false)} save={async (name,type) => { if (!groupId) return; const { data } = await supabase.from("games").insert({ group_id: groupId, name, scoring_type: type, high_score_wins: true, created_by: user.id }).select("id,name,scoring_type,high_score_wins,accent").single(); if (data) setGames([...games, data as Game]); setNewGame(false); }} />}
+    {newGame && <NewGameModal close={() => setNewGame(false)} save={async (name: string,type: string) => { if (!groupId) return; const { data } = await supabase.from("games").insert({ group_id: groupId, name, scoring_type: type as "points" | "win_loss" | "ranked", high_score_wins: true, created_by: user.id }).select("id,name,scoring_type,high_score_wins,accent").single(); if (data) setGames([...games, data as Game]); setNewGame(false); }} />}
   </div>;
 }
 
