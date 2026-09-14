@@ -14,16 +14,276 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      game_sessions: {
+        Row: {
+          created_at: string
+          ended_at: string | null
+          game_id: string
+          group_id: string
+          id: string
+          started_at: string
+          started_by: string
+          status: Database["public"]["Enums"]["session_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          ended_at?: string | null
+          game_id: string
+          group_id: string
+          id?: string
+          started_at?: string
+          started_by: string
+          status?: Database["public"]["Enums"]["session_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          ended_at?: string | null
+          game_id?: string
+          group_id?: string
+          id?: string
+          started_at?: string
+          started_by?: string
+          status?: Database["public"]["Enums"]["session_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_sessions_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "game_sessions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      games: {
+        Row: {
+          accent: string
+          created_at: string
+          created_by: string
+          group_id: string
+          high_score_wins: boolean
+          id: string
+          is_builtin: boolean
+          name: string
+          scoring_type: Database["public"]["Enums"]["scoring_type"]
+        }
+        Insert: {
+          accent?: string
+          created_at?: string
+          created_by: string
+          group_id: string
+          high_score_wins?: boolean
+          id?: string
+          is_builtin?: boolean
+          name: string
+          scoring_type: Database["public"]["Enums"]["scoring_type"]
+        }
+        Update: {
+          accent?: string
+          created_at?: string
+          created_by?: string
+          group_id?: string
+          high_score_wins?: boolean
+          id?: string
+          is_builtin?: boolean
+          name?: string
+          scoring_type?: Database["public"]["Enums"]["scoring_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "games_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_members: {
+        Row: {
+          group_id: string
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          group_id: string
+          joined_at?: string
+          user_id: string
+        }
+        Update: {
+          group_id?: string
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      groups: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          invite_code: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          invite_code?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          invite_code?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string
+          id: string
+          spirit_animal: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          id: string
+          spirit_animal?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          id?: string
+          spirit_animal?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      score_entries: {
+        Row: {
+          created_at: string
+          entered_by: string
+          id: string
+          player_id: string
+          round_number: number
+          score: number
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          entered_by: string
+          id?: string
+          player_id: string
+          round_number: number
+          score?: number
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          entered_by?: string
+          id?: string
+          player_id?: string
+          round_number?: number
+          score?: number
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "score_entries_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "score_entries_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "game_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_players: {
+        Row: {
+          final_rank: number | null
+          final_score: number
+          is_winner: boolean
+          player_id: string
+          session_id: string
+        }
+        Insert: {
+          final_rank?: number | null
+          final_score?: number
+          is_winner?: boolean
+          player_id: string
+          session_id: string
+        }
+        Update: {
+          final_rank?: number | null
+          final_score?: number
+          is_winner?: boolean
+          player_id?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_players_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_players_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "game_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      bootstrap_group: { Args: { _name: string }; Returns: string }
+      is_group_member: {
+        Args: { _group_id: string; _user_id?: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      scoring_type: "points" | "win_loss" | "ranked"
+      session_status: "active" | "completed" | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +410,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      scoring_type: ["points", "win_loss", "ranked"],
+      session_status: ["active", "completed", "cancelled"],
+    },
   },
 } as const
