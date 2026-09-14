@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { BarChart3, CirclePlus, Gamepad2, History, Minus, Plus, Trophy, Users, Volume2, X } from "lucide-react";
+import { useState } from "react";
+import { BarChart3, CirclePlus, Gamepad2, History, Minus, Plus, Trophy, Users, X } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, PolarAngleAxis, PolarGrid, Radar, RadarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
