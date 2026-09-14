@@ -22,12 +22,7 @@ type Player = { id: string; display_name: string; spirit_animal: string };
 type LivePlayer = Player & { score: number };
 type PastSession = { id: string; gameName: string; date: string; rounds: number; results: { playerId: string; name: string; score: number; rank: number }[] };
 const animals: Record<string, string> = { fox: "🦊", owl: "🦉", frog: "🐸", bear: "🐻", tiger: "🐯", panda: "🐼", octopus: "🐙", turtle: "🐢" };
-const demoPlayers: Player[] = [
-  { id: "maya", display_name: "Maya", spirit_animal: "tiger" },
-  { id: "nithin", display_name: "Nithin", spirit_animal: "fox" },
-  { id: "dev", display_name: "Dev", spirit_animal: "frog" },
-  { id: "rita", display_name: "Rita", spirit_animal: "owl" },
-];
+const demoPlayers: Player[] = [];
 const demoGames: Game[] = [
   { id: "sevens", name: "Sevens", scoring_type: "points", high_score_wins: false, accent: "lime" },
   { id: "poker", name: "Poker", scoring_type: "points", high_score_wins: true, accent: "yellow" },
