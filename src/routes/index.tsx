@@ -22,12 +22,7 @@ type Player = { id: string; display_name: string; spirit_animal: string };
 type LivePlayer = Player & { score: number };
 type PastSession = { id: string; gameName: string; date: string; rounds: number; results: { playerId: string; name: string; score: number; rank: number }[] };
 const animals: Record<string, string> = { fox: "🦊", owl: "🦉", frog: "🐸", bear: "🐻", tiger: "🐯", panda: "🐼", octopus: "🐙", turtle: "🐢" };
-const demoPlayers: Player[] = [
-  { id: "maya", display_name: "Maya", spirit_animal: "tiger" },
-  { id: "nithin", display_name: "Nithin", spirit_animal: "fox" },
-  { id: "dev", display_name: "Dev", spirit_animal: "frog" },
-  { id: "rita", display_name: "Rita", spirit_animal: "owl" },
-];
+const demoPlayers: Player[] = [];
 const demoGames: Game[] = [
   { id: "sevens", name: "Sevens", scoring_type: "points", high_score_wins: false, accent: "lime" },
   { id: "poker", name: "Poker", scoring_type: "points", high_score_wins: true, accent: "yellow" },
@@ -51,7 +46,7 @@ function GameApp() {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<PastSession[]>([]);
 
-  function startGame(game: Game) { setLiveGame(game); setLivePlayers(players.map((p) => ({ ...p, score: 0 }))); setRound(1); }
+  function startGame(game: Game) { if (players.length === 0) { setAddPlayer(true); return; } setLiveGame(game); setLivePlayers(players.map((p) => ({ ...p, score: 0 }))); setRound(1); }
   function adjust(id: string, by: number) { setLivePlayers((list) => list.map((p) => p.id === id ? { ...p, score: p.score + by } : p)); }
   function setScore(id: string, score: number) { setLivePlayers((list) => list.map((p) => p.id === id ? { ...p, score } : p)); }
   async function endGame() {
@@ -72,7 +67,7 @@ function GameApp() {
   const openProfile = players.find((p) => p.id === profileId);
   return <div className="min-h-screen bg-background pb-24 text-foreground">
     {celebrate && <Confetti />}
-    <header className="border-b border-border"><div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 md:px-7"><div><p className="text-sm font-bold text-primary">GAME NIGHT</p><h1 className="font-heading text-3xl font-bold">Nithin</h1></div><button onClick={()=>setAddPlayer(true)} aria-label="Add player" className="grid size-11 place-items-center rounded-full bg-secondary"><Users /></button></div></header>
+    <header className="border-b border-border"><div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 md:px-7"><div><p className="text-sm font-bold text-primary">GAME NIGHT</p><h1 className="font-heading text-3xl font-bold">ScoreUp</h1></div><button onClick={()=>setAddPlayer(true)} aria-label="Add player" className="grid size-11 place-items-center rounded-full bg-secondary"><Users /></button></div></header>
     <main className="mx-auto max-w-6xl px-4 py-8 md:px-7">
       {tab === "play" && <PlayView games={games} players={players} start={startGame} openNew={() => setNewGame(true)} openPlayer={setProfileId} openAddPlayer={() => setAddPlayer(true)} />}
       {tab === "ranks" && <RanksView players={players} sessions={sessions} openPlayer={setProfileId} />}
