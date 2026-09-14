@@ -67,7 +67,7 @@ function GameApp() {
   const openProfile = players.find((p) => p.id === profileId);
   return <div className="min-h-screen bg-background pb-24 text-foreground">
     {celebrate && <Confetti />}
-    <header className="border-b border-border"><div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 md:px-7"><div><p className="text-sm font-bold text-primary">GAME NIGHT</p><h1 className="font-heading text-3xl font-bold">Nithin</h1></div><button onClick={()=>setAddPlayer(true)} aria-label="Add player" className="grid size-11 place-items-center rounded-full bg-secondary"><Users /></button></div></header>
+    <header className="border-b border-border"><div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 md:px-7"><div><p className="text-sm font-bold text-primary">GAME NIGHT</p><h1 className="font-heading text-3xl font-bold">ScoreUp</h1></div><button onClick={()=>setAddPlayer(true)} aria-label="Add player" className="grid size-11 place-items-center rounded-full bg-secondary"><Users /></button></div></header>
     <main className="mx-auto max-w-6xl px-4 py-8 md:px-7">
       {tab === "play" && <PlayView games={games} players={players} start={startGame} openNew={() => setNewGame(true)} openPlayer={setProfileId} openAddPlayer={() => setAddPlayer(true)} />}
       {tab === "ranks" && <RanksView players={players} sessions={sessions} openPlayer={setProfileId} />}
