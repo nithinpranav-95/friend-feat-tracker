@@ -1,11 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import type { User } from "@supabase/supabase-js";
-import { BarChart3, ChevronRight, CirclePlus, Gamepad2, History, LogOut, Minus, Plus, Trophy, Users, Volume2, X } from "lucide-react";
+import { useState } from "react";
+import { BarChart3, CirclePlus, Gamepad2, History, Minus, Plus, Trophy, Users, X } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, PolarAngleAxis, PolarGrid, Radar, RadarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
-import { lovable } from "@/integrations/lovable";
-import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
@@ -37,120 +34,29 @@ const demoGames: Game[] = [
 ];
 
 function ScoreUp() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => { setUser(data.user); setLoading(false); });
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user ?? null));
-    return () => data.subscription.unsubscribe();
-  }, []);
-  if (loading) return <div className="grid min-h-screen place-items-center bg-background"><div className="animal-bob text-5xl">🎲</div></div>;
-  return user ? <GameApp user={user} /> : <AuthScreen />;
+  return <GameApp />;
 }
 
-function AuthScreen() {
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
-  const submit = async () => {
-    setBusy(true); setMessage("");
-    const result = mode === "signin" ? await supabase.auth.signInWithPassword({ email, password }) : await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
-    setBusy(false);
-    if (result.error) setMessage(result.error.message);
-    else if (mode === "signup" && !result.data.session) setMessage("Check your email to confirm your account.");
-  };
-  const google = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-    if (result.error) setMessage(result.error.message);
-  };
-  return <main className="min-h-screen bg-background px-5 py-8 text-foreground">
-    <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-5xl items-center gap-12 lg:grid-cols-2">
-      <section>
-        <div className="mb-8 inline-flex size-14 items-center justify-center rounded-2xl bg-primary text-2xl text-primary-foreground">🎲</div>
-        <p className="font-bold text-primary">GAME NIGHT, LEVELLED UP</p>
-        <h1 className="mt-3 max-w-xl font-heading text-5xl font-bold leading-[1.02] md:text-7xl">Scores remembered. Glory forever.</h1>
-        <p className="mt-5 max-w-lg text-lg text-muted-foreground">Run live rounds, settle friendly rivalries and see who really owns game night.</p>
-        <div className="mt-8 flex gap-3 text-3xl"><span className="animal-bob">🦊</span><span className="animal-bob [animation-delay:250ms]">🐸</span><span className="animal-bob [animation-delay:500ms]">🦉</span><span className="animal-bob [animation-delay:750ms]">🐯</span></div>
-      </section>
-      <section className="rounded-[1.5rem] border border-border bg-card p-6 md:p-8">
-        <h2 className="font-heading text-3xl font-bold">{mode === "signin" ? "Welcome back" : "Join the squad"}</h2>
-        <p className="mt-1 text-muted-foreground">{mode === "signin" ? "Your leaderboard awaits." : "Create your player account."}</p>
-        <Button onClick={google} variant="outline" className="mt-6 h-12 w-full rounded-xl border-border bg-secondary text-secondary-foreground hover:bg-subtle">Continue with Google</Button>
-        <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />OR<span className="h-px flex-1 bg-border" /></div>
-        <div className="space-y-3">
-          <input aria-label="Email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email address" type="email" className="h-12 w-full rounded-xl border border-border bg-secondary px-4 outline-none focus:border-primary" />
-          <input aria-label="Password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" className="h-12 w-full rounded-xl border border-border bg-secondary px-4 outline-none focus:border-primary" />
-          <Button disabled={busy || !email || password.length < 6} onClick={submit} className="h-12 w-full rounded-xl bg-primary font-bold text-primary-foreground hover:bg-primary/90">{busy ? "One moment…" : mode === "signin" ? "Sign in" : "Create account"}</Button>
-        </div>
-        {message && <p role="status" className="mt-4 text-sm text-primary">{message}</p>}
-        <button onClick={() => setMode(mode === "signin" ? "signup" : "signin")} className="mt-5 w-full text-sm font-bold text-muted-foreground hover:text-foreground">{mode === "signin" ? "New here? Create an account" : "Already playing? Sign in"}</button>
-      </section>
-    </div>
-  </main>;
-}
-
-function GameApp({ user }: { user: User }) {
+function GameApp() {
   const [tab, setTab] = useState<Tab>("play");
-  const [profile, setProfile] = useState<Player | null>(null);
-  const [groupId, setGroupId] = useState<string | null>(null);
   const [games, setGames] = useState<Game[]>(demoGames);
   const [players, setPlayers] = useState<Player[]>(demoPlayers);
-  const [setupName, setSetupName] = useState(String(user.user_metadata?.["full_name"] ?? ""));
-  const [setupAnimal, setSetupAnimal] = useState("fox");
-  const [setupGroup, setSetupGroup] = useState("Friday Night Crew");
-  const [setup, setSetup] = useState(true);
   const [liveGame, setLiveGame] = useState<Game | null>(null);
   const [livePlayers, setLivePlayers] = useState<LivePlayer[]>([]);
   const [round, setRound] = useState(1);
   const [celebrate, setCelebrate] = useState(false);
   const [newGame, setNewGame] = useState(false);
 
-  useEffect(() => { void load(); }, []);
-  async function load() {
-    const { data: p } = await supabase.from("profiles").select("id,display_name,spirit_animal").eq("id", user.id).maybeSingle();
-    if (!p) { setSetup(true); return; }
-    setProfile(p); setSetup(false);
-    const { data: memberships } = await supabase.from("group_members").select("group_id").eq("user_id", user.id).limit(1);
-    const gid = memberships?.[0]?.group_id;
-    if (!gid) return;
-    setGroupId(gid);
-    const [{ data: gameRows }, { data: memberRows }] = await Promise.all([
-      supabase.from("games").select("id,name,scoring_type,high_score_wins,accent").eq("group_id", gid),
-      supabase.from("group_members").select("user_id, profiles!group_members_user_id_fkey(id,display_name,spirit_animal)").eq("group_id", gid),
-    ]);
-    if (gameRows?.length) setGames(gameRows as Game[]);
-    const mapped = (memberRows ?? []).flatMap((row: any) => row.profiles ? [row.profiles as Player] : []);
-    if (mapped.length) setPlayers(mapped);
-  }
-  async function finishSetup() {
-    if (!setupName.trim()) return;
-    const { error: profileError } = await supabase.from("profiles").upsert({ id: user.id, display_name: setupName.trim(), spirit_animal: setupAnimal });
-    if (profileError) return;
-    const { data: group } = await supabase.from("groups").insert({ name: setupGroup.trim() || "Game Night", created_by: user.id }).select("id").single();
-    setProfile({ id: user.id, display_name: setupName.trim(), spirit_animal: setupAnimal });
-    if (group) setGroupId(group.id);
-    setSetup(false); void load();
-  }
   function startGame(game: Game) { setLiveGame(game); setLivePlayers(players.map((p) => ({ ...p, score: 0 }))); setRound(1); }
   function adjust(id: string, by: number) { setLivePlayers((list) => list.map((p) => p.id === id ? { ...p, score: p.score + by } : p)); }
   async function endGame() {
-    if (groupId && liveGame && livePlayers.length) {
-      const { data: session } = await supabase.from("game_sessions").insert({ group_id: groupId, game_id: liveGame.id, started_by: user.id, status: "completed", ended_at: new Date().toISOString() }).select("id").single();
-      if (session) {
-        const sorted = [...livePlayers].sort((a,b) => liveGame.high_score_wins ? b.score-a.score : a.score-b.score);
-        await supabase.from("session_players").insert(sorted.map((p,i) => ({ session_id: session.id, player_id: p.id, final_score: p.score, final_rank: i+1, is_winner: i===0 })));
-      }
-    }
     playVictory(); setCelebrate(true); setTimeout(() => setCelebrate(false), 2800); setLiveGame(null);
   }
   const nav = [{ id:"play", icon:Gamepad2, label:"Play" }, { id:"ranks", icon:Trophy, label:"Ranks" }, { id:"stats", icon:BarChart3, label:"Stats" }, { id:"history", icon:History, label:"History" }] as const;
-  if (setup) return <Setup name={setupName} setName={setSetupName} animal={setupAnimal} setAnimal={setSetupAnimal} group={setupGroup} setGroup={setSetupGroup} done={finishSetup} />;
   if (liveGame) return <LiveSession game={liveGame} players={livePlayers} round={round} setRound={setRound} adjust={adjust} end={endGame} close={() => setLiveGame(null)} />;
   return <div className="min-h-screen bg-background pb-24 text-foreground">
     {celebrate && <Confetti />}
-    <header className="border-b border-border"><div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 md:px-7"><div><p className="text-sm font-bold text-primary">GAME NIGHT</p><h1 className="font-heading text-3xl font-bold">{profile?.display_name}</h1></div><div className="flex items-center gap-3"><button aria-label="Friends" className="grid size-11 place-items-center rounded-full bg-secondary"><Users /></button><button aria-label="Sign out" onClick={() => supabase.auth.signOut()} className="grid size-11 place-items-center rounded-full bg-secondary text-muted-foreground"><LogOut className="size-5" /></button></div></div></header>
+    <header className="border-b border-border"><div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 md:px-7"><div><p className="text-sm font-bold text-primary">GAME NIGHT</p><h1 className="font-heading text-3xl font-bold">Nithin</h1></div><button aria-label="Friends" className="grid size-11 place-items-center rounded-full bg-secondary"><Users /></button></div></header>
     <main className="mx-auto max-w-6xl px-4 py-8 md:px-7">
       {tab === "play" && <PlayView games={games} players={players} start={startGame} openNew={() => setNewGame(true)} />}
       {tab === "ranks" && <RanksView players={players} />}
@@ -158,12 +64,8 @@ function GameApp({ user }: { user: User }) {
       {tab === "history" && <HistoryView />}
     </main>
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 backdrop-blur"><div className="mx-auto flex max-w-xl justify-around px-3 py-2">{nav.map((item) => <button key={item.id} onClick={() => setTab(item.id)} className={`flex min-w-16 flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold ${tab === item.id ? "text-primary" : "text-muted-foreground"}`}><item.icon className="size-6" />{item.label}</button>)}</div></nav>
-    {newGame && <NewGameModal close={() => setNewGame(false)} save={async (name: string,type: string) => { if (!groupId) return; const { data } = await supabase.from("games").insert({ group_id: groupId, name, scoring_type: type as "points" | "win_loss" | "ranked", high_score_wins: true, created_by: user.id }).select("id,name,scoring_type,high_score_wins,accent").single(); if (data) setGames([...games, data as Game]); setNewGame(false); }} />}
+    {newGame && <NewGameModal close={() => setNewGame(false)} save={(name: string,type: string) => { setGames([...games, { id: crypto.randomUUID(), name, scoring_type: type, high_score_wins: true, accent: "lime" }]); setNewGame(false); }} />}
   </div>;
-}
-
-function Setup({ name,setName,animal,setAnimal,group,setGroup,done }: any) {
-  return <main className="grid min-h-screen place-items-center bg-background p-5"><section className="w-full max-w-lg rounded-[1.5rem] border border-border bg-card p-6"><p className="font-bold text-primary">CREATE YOUR PLAYER</p><h1 className="mt-2 font-heading text-4xl font-bold">Pick your game-night identity</h1><label className="mt-6 block text-sm font-bold">Your name</label><input value={name} onChange={(e)=>setName(e.target.value)} className="mt-2 h-12 w-full rounded-xl border border-border bg-secondary px-4 outline-none focus:border-primary" placeholder="How friends know you" /><label className="mt-5 block text-sm font-bold">Spirit animal</label><div className="mt-3 grid grid-cols-4 gap-2">{Object.entries(animals).map(([key,emoji]) => <button key={key} onClick={()=>setAnimal(key)} className={`grid h-16 place-items-center rounded-xl text-3xl ${animal===key ? "bg-primary ring-2 ring-primary" : "bg-secondary"}`}><span className="animal-bob">{emoji}</span></button>)}</div><label className="mt-5 block text-sm font-bold">Group name</label><input value={group} onChange={(e)=>setGroup(e.target.value)} className="mt-2 h-12 w-full rounded-xl border border-border bg-secondary px-4 outline-none focus:border-primary" /><Button onClick={done} disabled={!name.trim()} className="mt-6 h-12 w-full rounded-xl bg-primary font-bold text-primary-foreground">Enter game night <ChevronRight /></Button></section></main>;
 }
 
 function PlayView({ games, players, start, openNew }: { games:Game[];players:Player[];start:(g:Game)=>void;openNew:()=>void }) {
