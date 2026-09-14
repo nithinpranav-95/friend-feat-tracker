@@ -46,7 +46,7 @@ function GameApp() {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<PastSession[]>([]);
 
-  function startGame(game: Game) { setLiveGame(game); setLivePlayers(players.map((p) => ({ ...p, score: 0 }))); setRound(1); }
+  function startGame(game: Game) { if (players.length === 0) { setAddPlayer(true); return; } setLiveGame(game); setLivePlayers(players.map((p) => ({ ...p, score: 0 }))); setRound(1); }
   function adjust(id: string, by: number) { setLivePlayers((list) => list.map((p) => p.id === id ? { ...p, score: p.score + by } : p)); }
   function setScore(id: string, score: number) { setLivePlayers((list) => list.map((p) => p.id === id ? { ...p, score } : p)); }
   async function endGame() {
