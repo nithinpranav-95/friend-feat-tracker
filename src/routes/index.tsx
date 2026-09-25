@@ -358,21 +358,28 @@ function GameApp() {
       const ordered = [...livePlayers].sort((a, b) =>
         liveGame.high_score_wins ? b.score - a.score : a.score - b.score,
       );
-      setSessions((list) => [
-        {
-          id: crypto.randomUUID(),
-          gameName: liveGame.name,
-          date: new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" }),
-          rounds: round,
-          results: ordered.map((p, i) => ({
-            playerId: p.id,
-            name: p.display_name,
-            score: p.score,
-            rank: i + 1,
-          })),
-        },
-        ...list,
-      ]);
+      const results = ordered.map((p, i) => ({
+        playerId: p.id,
+        name: p.display_name,
+        score: p.score,
+        rank: i + 1,
+      }));
+      const now = new Date();
+      const session: PastSession = {
+        id: crypto.randomUUID(),
+        gameName: liveGame.name,
+        date: now.toLocaleDateString(undefined, { day: "numeric", month: "short" }),
+        rounds: round,
+        results,
+      };
+      const { data, error } = await supabase
+        .from("game_results")
+        .insert({ game_name: liveGame.name, rounds: round, results })
+        .select()
+        .single();
+      if (error) console.debug("Failed to save game result:", error);
+      if (data) session.id = data.id;
+      setSessions((list) => [session, ...list]);
     }
     playVictory();
     setCelebrate(true);
