@@ -31,6 +31,7 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -64,7 +65,7 @@ type Player = {
   id: string;
   display_name: string;
   spirit_animal: string;
-  quote?: string;
+  quote?: string | undefined;
 };
 type LivePlayer = Player & { score: number };
 type PastSession = {
@@ -233,56 +234,57 @@ function GameApp() {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<PastSession[]>([]);
 
-  // Hydrate from localStorage once on client
+  // Load shared data from the cloud on mount
   useEffect(() => {
-    try {
-      const savedPlayers = localStorage.getItem("scoreup_players");
-      if (savedPlayers) {
-        const parsed = JSON.parse(savedPlayers);
-        if (Array.isArray(parsed)) {
-          // Remove any preset players from previous version
-          const userOnly = parsed.filter((p: Player) => !p.id.startsWith("p"));
-          setPlayers(userOnly);
-        }
+    let cancelled = false;
+    (async () => {
+      const [playersRes, gamesRes, resultsRes] = await Promise.all([
+        supabase.from("players").select("*").order("created_at"),
+        supabase.from("custom_games").select("*").order("created_at"),
+        supabase.from("game_results").select("*").order("played_at", { ascending: false }),
+      ]);
+      if (cancelled) return;
+      if (playersRes.data) {
+        setPlayers(
+          playersRes.data.map((r) => ({
+            id: r.id,
+            display_name: r.name,
+            spirit_animal: r.spirit_animal,
+            quote: r.quote ?? undefined,
+          })),
+        );
       }
-      const savedGames = localStorage.getItem("scoreup_games");
-      if (savedGames) {
-        const parsed = JSON.parse(savedGames);
-        if (Array.isArray(parsed) && parsed.length > 0) setGames(parsed);
+      if (gamesRes.data && gamesRes.data.length > 0) {
+        setGames([
+          ...demoGames,
+          ...gamesRes.data.map((g) => ({
+            id: g.id,
+            name: g.name,
+            scoring_type: g.scoring_type,
+            high_score_wins: g.high_score_wins,
+            accent: g.accent,
+          })),
+        ]);
       }
-      const savedSessions = localStorage.getItem("scoreup_sessions");
-      if (savedSessions) {
-        const parsed = JSON.parse(savedSessions);
-        if (Array.isArray(parsed)) setSessions(parsed);
+      if (resultsRes.data) {
+        setSessions(
+          resultsRes.data.map((r) => ({
+            id: r.id,
+            gameName: r.game_name,
+            date: new Date(r.played_at).toLocaleDateString(undefined, {
+              day: "numeric",
+              month: "short",
+            }),
+            rounds: r.rounds,
+            results: (r.results as PastSession["results"]) ?? [],
+          })),
+        );
       }
-    } catch (e) {
-      console.debug("Failed to load local storage state:", e);
-    }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("scoreup_players", JSON.stringify(players));
-    } catch (e) {
-      console.debug("Failed to save players to local storage:", e);
-    }
-  }, [players]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("scoreup_games", JSON.stringify(games));
-    } catch (e) {
-      console.debug("Failed to save games to local storage:", e);
-    }
-  }, [games]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("scoreup_sessions", JSON.stringify(sessions));
-    } catch (e) {
-      console.debug("Failed to save sessions to local storage:", e);
-    }
-  }, [sessions]);
 
   function handleSelectGame(game: Game) {
     if (players.length === 0) {
@@ -293,14 +295,18 @@ function GameApp() {
     setSetupGame(game);
   }
 
-  function handleAddPlayer(name: string, animal: string, quote?: string) {
+  async function handleAddPlayer(name: string, animal: string, quote?: string) {
     const defaultQuote = spiritAnimals[animal]?.defaultQuote || "Bold & fearless";
-    const newP: Player = {
-      id: crypto.randomUUID(),
-      display_name: name,
-      spirit_animal: animal,
-      quote: quote?.trim() || defaultQuote,
-    };
+    const finalQuote = quote?.trim() || defaultQuote;
+    const { data, error } = await supabase
+      .from("players")
+      .insert({ name, spirit_animal: animal, quote: finalQuote })
+      .select()
+      .single();
+    const newP: Player = data
+      ? { id: data.id, display_name: data.name, spirit_animal: data.spirit_animal, quote: data.quote ?? undefined }
+      : { id: crypto.randomUUID(), display_name: name, spirit_animal: animal, quote: finalQuote };
+    if (error) console.debug("Failed to save player:", error);
     setPlayers((prev) => [...prev, newP]);
     setAddPlayer(false);
     if (pendingGame) {
@@ -309,15 +315,22 @@ function GameApp() {
     }
   }
 
-  function handleUpdatePlayer(updated: Player) {
+  async function handleUpdatePlayer(updated: Player) {
     setPlayers((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
     setEditingPlayer(null);
+    const { error } = await supabase
+      .from("players")
+      .update({ name: updated.display_name, spirit_animal: updated.spirit_animal, quote: updated.quote ?? null })
+      .eq("id", updated.id);
+    if (error) console.debug("Failed to update player:", error);
   }
 
-  function handleDeletePlayer(id: string) {
+  async function handleDeletePlayer(id: string) {
     setPlayers((prev) => prev.filter((p) => p.id !== id));
     setEditingPlayer(null);
     if (profileId === id) setProfileId(null);
+    const { error } = await supabase.from("players").delete().eq("id", id);
+    if (error) console.debug("Failed to delete player:", error);
   }
 
   function startSessionWithPlayers(game: Game, selectedPlayers: Player[]) {
@@ -345,21 +358,28 @@ function GameApp() {
       const ordered = [...livePlayers].sort((a, b) =>
         liveGame.high_score_wins ? b.score - a.score : a.score - b.score,
       );
-      setSessions((list) => [
-        {
-          id: crypto.randomUUID(),
-          gameName: liveGame.name,
-          date: new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" }),
-          rounds: round,
-          results: ordered.map((p, i) => ({
-            playerId: p.id,
-            name: p.display_name,
-            score: p.score,
-            rank: i + 1,
-          })),
-        },
-        ...list,
-      ]);
+      const results = ordered.map((p, i) => ({
+        playerId: p.id,
+        name: p.display_name,
+        score: p.score,
+        rank: i + 1,
+      }));
+      const now = new Date();
+      const session: PastSession = {
+        id: crypto.randomUUID(),
+        gameName: liveGame.name,
+        date: now.toLocaleDateString(undefined, { day: "numeric", month: "short" }),
+        rounds: round,
+        results,
+      };
+      const { data, error } = await supabase
+        .from("game_results")
+        .insert({ game_name: liveGame.name, rounds: round, results })
+        .select()
+        .single();
+      if (error) console.debug("Failed to save game result:", error);
+      if (data) session.id = data.id;
+      setSessions((list) => [session, ...list]);
     }
     playVictory();
     setCelebrate(true);
@@ -496,11 +516,17 @@ function GameApp() {
       {newGame && (
         <NewGameModal
           close={() => setNewGame(false)}
-          save={(name: string, type: string) => {
+          save={async (name: string, type: string) => {
+            const { data, error } = await supabase
+              .from("custom_games")
+              .insert({ name, scoring_type: type, high_score_wins: true, accent: "lime" })
+              .select()
+              .single();
+            if (error) console.debug("Failed to save game:", error);
             setGames([
               ...games,
               {
-                id: crypto.randomUUID(),
+                id: data?.id ?? crypto.randomUUID(),
                 name,
                 scoring_type: type,
                 high_score_wins: true,
@@ -814,7 +840,7 @@ function AddPlayerModal({
 }) {
   const [name, setName] = useState("");
   const [animal, setAnimal] = useState("lion");
-  const [quote, setQuote] = useState(spiritAnimals.lion.defaultQuote);
+  const [quote, setQuote] = useState(spiritAnimals["lion"]?.defaultQuote ?? "Bold & fearless");
 
   function handleSelectAnimal(key: string) {
     setAnimal(key);
@@ -1465,7 +1491,7 @@ function LiveSession({
           </div>
           <div className="text-right">
             <span className="animal-bob inline-block text-3xl">
-              {animals[sorted[0]?.spirit_animal]}
+              {animals[sorted[0]?.spirit_animal ?? ""]}
             </span>
             <p className="text-3xl font-black tabular-nums">{sorted[0]?.score}</p>
           </div>
@@ -1845,7 +1871,7 @@ function StatsView({ players, sessions }: { players: Player[]; sessions: PastSes
                   tick={{ fontSize: 12 }}
                   tickLine={false}
                   domain={metric === "rate" ? [0, 100] : [0, "auto"]}
-                  tickFormatter={metric === "rate" ? (v) => `${v}%` : undefined}
+                  tickFormatter={(v) => (metric === "rate" ? `${v}%` : `${v}`)}
                   allowDecimals={false}
                 />
                 <Tooltip content={<CustomStatsTooltip />} />
@@ -1887,7 +1913,7 @@ function StatsView({ players, sessions }: { players: Player[]; sessions: PastSes
                   type="number"
                   stroke="var(--muted-foreground)"
                   domain={metric === "rate" ? [0, 100] : [0, "auto"]}
-                  tickFormatter={metric === "rate" ? (v) => `${v}%` : undefined}
+                  tickFormatter={(v) => (metric === "rate" ? `${v}%` : `${v}`)}
                   allowDecimals={false}
                   tickLine={false}
                 />
@@ -1935,7 +1961,8 @@ function CustomStatsTooltip({
   payload?: Array<{ payload: PlayerStat & { value: number; displayLabel: string } }>;
 }) {
   if (!active || !payload || !payload.length) return null;
-  const data = payload[0].payload;
+  const data = payload[0]?.payload;
+  if (!data) return null;
   return (
     <div className="rounded-2xl border border-border bg-card/95 p-3.5 shadow-xl backdrop-blur-sm">
       <div className="flex items-center gap-2">
