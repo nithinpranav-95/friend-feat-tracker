@@ -65,7 +65,7 @@ type Player = {
   id: string;
   display_name: string;
   spirit_animal: string;
-  quote?: string;
+  quote?: string | undefined;
 };
 type LivePlayer = Player & { score: number };
 type PastSession = {
@@ -840,7 +840,7 @@ function AddPlayerModal({
 }) {
   const [name, setName] = useState("");
   const [animal, setAnimal] = useState("lion");
-  const [quote, setQuote] = useState(spiritAnimals.lion.defaultQuote);
+  const [quote, setQuote] = useState(spiritAnimals["lion"]?.defaultQuote ?? "Bold & fearless");
 
   function handleSelectAnimal(key: string) {
     setAnimal(key);
@@ -1491,7 +1491,7 @@ function LiveSession({
           </div>
           <div className="text-right">
             <span className="animal-bob inline-block text-3xl">
-              {animals[sorted[0]?.spirit_animal]}
+              {animals[sorted[0]?.spirit_animal ?? ""]}
             </span>
             <p className="text-3xl font-black tabular-nums">{sorted[0]?.score}</p>
           </div>
