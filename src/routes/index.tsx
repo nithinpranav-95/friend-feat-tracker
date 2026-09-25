@@ -161,6 +161,14 @@ const animals: Record<string, string> = Object.fromEntries(
   Object.entries(spiritAnimals).map(([k, v]) => [k, v.emoji]),
 );
 const demoPlayers: Player[] = [];
+const sampleSquad: Player[] = [
+  { id: "jordan", display_name: "Jordan", spirit_animal: "lion", quote: "Bold & fearless" },
+  { id: "alex", display_name: "Alex", spirit_animal: "fox", quote: "Tactical & cunning" },
+  { id: "sam", display_name: "Sam", spirit_animal: "panda", quote: "Calm under pressure" },
+  { id: "taylor", display_name: "Taylor", spirit_animal: "owl", quote: "Master strategist" },
+  { id: "morgan", display_name: "Morgan", spirit_animal: "dragon", quote: "High stakes legend" },
+  { id: "riley", display_name: "Riley", spirit_animal: "chameleon", quote: "Adapts to any game" },
+];
 const demoGames: Game[] = [
   { id: "sevens", name: "Sevens", scoring_type: "points", high_score_wins: false, accent: "lime" },
   { id: "poker", name: "Poker", scoring_type: "points", high_score_wins: true, accent: "yellow" },
@@ -233,56 +241,94 @@ function GameApp() {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<PastSession[]>([]);
 
-  // Hydrate from localStorage once on client
+  const [hydrated, setHydrated] = useState(false);
+
+  // Hydrate from localStorage safely on client
   useEffect(() => {
     try {
+      let loadedPlayers: Player[] = [];
       const savedPlayers = localStorage.getItem("scoreup_players");
       if (savedPlayers) {
         const parsed = JSON.parse(savedPlayers);
-        if (Array.isArray(parsed)) {
-          // Remove any preset players from previous version
-          const userOnly = parsed.filter((p: Player) => !p.id.startsWith("p"));
-          setPlayers(userOnly);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          loadedPlayers = parsed;
+          setPlayers(parsed);
         }
       }
+
       const savedGames = localStorage.getItem("scoreup_games");
       if (savedGames) {
         const parsed = JSON.parse(savedGames);
         if (Array.isArray(parsed) && parsed.length > 0) setGames(parsed);
       }
+
+      let loadedSessions: PastSession[] = [];
       const savedSessions = localStorage.getItem("scoreup_sessions");
       if (savedSessions) {
         const parsed = JSON.parse(savedSessions);
-        if (Array.isArray(parsed)) setSessions(parsed);
+        if (Array.isArray(parsed)) {
+          loadedSessions = parsed;
+          setSessions(parsed);
+        }
+      }
+
+      // Recovery: If players list is empty but past session records exist, recover players!
+      if (loadedPlayers.length === 0 && loadedSessions.length > 0) {
+        const recovered = new Map<string, Player>();
+        loadedSessions.forEach((s) => {
+          s.results.forEach((r) => {
+            if (r.name && !recovered.has(r.name.trim().toLowerCase())) {
+              recovered.set(r.name.trim().toLowerCase(), {
+                id: r.playerId || crypto.randomUUID(),
+                display_name: r.name,
+                spirit_animal: "fox",
+                quote: "Game night legend",
+              });
+            }
+          });
+        });
+        if (recovered.size > 0) {
+          const recoveredList = Array.from(recovered.values());
+          setPlayers(recoveredList);
+        }
       }
     } catch (e) {
       console.debug("Failed to load local storage state:", e);
+    } finally {
+      setHydrated(true);
     }
   }, []);
 
   useEffect(() => {
+    if (!hydrated) return;
     try {
       localStorage.setItem("scoreup_players", JSON.stringify(players));
     } catch (e) {
       console.debug("Failed to save players to local storage:", e);
     }
-  }, [players]);
+  }, [players, hydrated]);
 
   useEffect(() => {
+    if (!hydrated) return;
     try {
       localStorage.setItem("scoreup_games", JSON.stringify(games));
     } catch (e) {
       console.debug("Failed to save games to local storage:", e);
     }
-  }, [games]);
+  }, [games, hydrated]);
 
   useEffect(() => {
+    if (!hydrated) return;
     try {
       localStorage.setItem("scoreup_sessions", JSON.stringify(sessions));
     } catch (e) {
       console.debug("Failed to save sessions to local storage:", e);
     }
-  }, [sessions]);
+  }, [sessions, hydrated]);
+
+  function handleLoadSampleSquad() {
+    setPlayers(sampleSquad);
+  }
 
   function handleSelectGame(game: Game) {
     if (players.length === 0) {
@@ -451,6 +497,7 @@ function GameApp() {
             openPlayer={setProfileId}
             openAddPlayer={() => setAddPlayer(true)}
             goToPlayers={() => setTab("players")}
+            onLoadSampleSquad={handleLoadSampleSquad}
           />
         )}
         {tab === "players" && (
@@ -460,6 +507,7 @@ function GameApp() {
             openPlayer={setProfileId}
             openEditPlayer={(p) => setEditingPlayer(p)}
             openAddPlayer={() => setAddPlayer(true)}
+            onLoadSampleSquad={handleLoadSampleSquad}
           />
         )}
         {tab === "ranks" && (
@@ -897,12 +945,14 @@ function PlayersView({
   openPlayer,
   openEditPlayer,
   openAddPlayer,
+  onLoadSampleSquad,
 }: {
   players: Player[];
   sessions: PastSession[];
   openPlayer: (id: string) => void;
   openEditPlayer: (player: Player) => void;
   openAddPlayer: () => void;
+  onLoadSampleSquad?: () => void;
 }) {
   const statsMap = new Map<string, PlayerStat>();
   playerStats(players, sessions).forEach((s) => statsMap.set(s.id, s));
@@ -925,14 +975,26 @@ function PlayersView({
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={openAddPlayer}
-          className="inline-flex self-start items-center justify-center gap-2 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-purple-500/20 transition hover:brightness-110 hover:shadow-purple-500/30 active:scale-95 sm:self-auto"
-        >
-          <UserPlus className="size-4" />
-          <span>Add Friend</span>
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {players.length === 0 && onLoadSampleSquad && (
+            <button
+              type="button"
+              onClick={onLoadSampleSquad}
+              className="inline-flex items-center justify-center gap-1.5 rounded-full border border-border bg-secondary px-4 py-2 text-xs font-bold text-foreground transition hover:border-primary hover:text-primary"
+            >
+              <span>🦁</span>
+              <span>Load Mockup Squad</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={openAddPlayer}
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-purple-500/20 transition hover:brightness-110 hover:shadow-purple-500/30 active:scale-95"
+          >
+            <UserPlus className="size-4" />
+            <span>Add Friend</span>
+          </button>
+        </div>
       </div>
 
       {players.length === 0 ? (
@@ -945,14 +1007,26 @@ function PlayersView({
             Create profiles with spirit animals, nicknames, and catchphrases. Career stats, win
             rates, and trophies will accumulate as you play games.
           </p>
-          <button
-            type="button"
-            onClick={openAddPlayer}
-            className="mt-6 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600 px-6 py-3 font-bold text-white shadow-lg shadow-purple-500/20 hover:brightness-110"
-          >
-            <UserPlus className="size-4" />
-            <span>Add Your First Friend</span>
-          </button>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={openAddPlayer}
+              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600 px-6 py-3 font-bold text-white shadow-lg shadow-purple-500/20 hover:brightness-110"
+            >
+              <UserPlus className="size-4" />
+              <span>Add Your First Friend</span>
+            </button>
+            {onLoadSampleSquad && (
+              <button
+                type="button"
+                onClick={onLoadSampleSquad}
+                className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-6 py-3 font-bold text-foreground transition hover:bg-primary/20 hover:text-primary"
+              >
+                <span>🦁</span>
+                <span>Load Sample Squad ({sampleSquad.length} friends)</span>
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -1073,6 +1147,7 @@ function PlayView({
   openPlayer,
   openAddPlayer,
   goToPlayers,
+  onLoadSampleSquad,
 }: {
   games: Game[];
   players: Player[];
@@ -1081,6 +1156,7 @@ function PlayView({
   openPlayer: (id: string) => void;
   openAddPlayer: () => void;
   goToPlayers?: () => void;
+  onLoadSampleSquad?: () => void;
 }) {
   return (
     <>
@@ -1143,12 +1219,23 @@ function PlayView({
             <p className="mt-1 max-w-sm text-sm text-muted-foreground">
               Add your friends' names and spirit animals when you are ready to play.
             </p>
-            <Button
-              onClick={openAddPlayer}
-              className="mt-5 h-12 rounded-xl bg-primary px-6 font-bold text-primary-foreground shadow-md hover:brightness-105"
-            >
-              <Plus className="mr-1.5 size-4" /> Add your first player
-            </Button>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+              <Button
+                onClick={openAddPlayer}
+                className="h-12 rounded-xl bg-primary px-6 font-bold text-primary-foreground shadow-md hover:brightness-105"
+              >
+                <Plus className="mr-1.5 size-4" /> Add your first player
+              </Button>
+              {onLoadSampleSquad && (
+                <Button
+                  onClick={onLoadSampleSquad}
+                  variant="secondary"
+                  className="h-12 rounded-xl border border-border px-6 font-bold text-foreground hover:bg-primary/20 hover:text-primary"
+                >
+                  🦁 Load sample squad (6 friends)
+                </Button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="mt-5 space-y-2.5">
