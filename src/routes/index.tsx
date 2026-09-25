@@ -1961,7 +1961,8 @@ function CustomStatsTooltip({
   payload?: Array<{ payload: PlayerStat & { value: number; displayLabel: string } }>;
 }) {
   if (!active || !payload || !payload.length) return null;
-  const data = payload[0].payload;
+  const data = payload[0]?.payload;
+  if (!data) return null;
   return (
     <div className="rounded-2xl border border-border bg-card/95 p-3.5 shadow-xl backdrop-blur-sm">
       <div className="flex items-center gap-2">
