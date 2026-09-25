@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import {
   ArrowUpDown,
@@ -7,12 +7,15 @@ import {
   CirclePlus,
   Gamepad2,
   History,
+  LogIn,
+  LogOut,
   Minus,
   Pencil,
   Play,
   Plus,
   Trash2,
   Trophy,
+  User,
   UserPlus,
   Users,
   X,
@@ -32,6 +35,13 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  useAuth,
+  signOut as authSignOut,
+  cleanQuote,
+  parseQuoteAuth,
+  encodeQuoteAuth,
+} from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -233,6 +243,8 @@ function GameApp() {
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<PastSession[]>([]);
+  const { user: authUser } = useAuth();
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
 
   const [hydrated, setHydrated] = useState(false);
 
@@ -424,6 +436,25 @@ function GameApp() {
     }
   }, [sessions, hydrated]);
 
+  // Ensure logged-in user is recognized in players list
+  useEffect(() => {
+    if (!authUser || !hydrated) return;
+    setPlayers((prev) => {
+      if (prev.some((p) => p.display_name.toLowerCase() === authUser.name.toLowerCase())) {
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          id: authUser.id,
+          display_name: authUser.name,
+          spirit_animal: authUser.spirit_animal,
+          quote: authUser.quote,
+        },
+      ];
+    });
+  }, [authUser, hydrated]);
+
   function handleSelectGame(game: Game) {
     if (players.length === 0) {
       setPendingGame(game);
@@ -605,17 +636,89 @@ function GameApp() {
             ))}
           </div>
 
-          <button
-            onClick={() => setTab("players")}
-            aria-label="Friends and Players"
-            className={`grid size-11 place-items-center rounded-full transition ${
-              tab === "players"
-                ? "bg-primary text-primary-foreground shadow-md"
-                : "bg-secondary text-foreground hover:bg-secondary/80"
-            }`}
-          >
-            <Users className="size-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setTab("players")}
+              aria-label="Friends and Players"
+              title="Squad Profiles"
+              className={`grid size-10 place-items-center rounded-full transition sm:size-11 ${
+                tab === "players"
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : "bg-secondary text-foreground hover:bg-secondary/80"
+              }`}
+            >
+              <Users className="size-5" />
+            </button>
+
+            {authUser ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowAccountMenu((v) => !v)}
+                  className="flex items-center gap-1.5 rounded-full border border-border/80 bg-secondary/80 py-1.5 pl-2 pr-3 text-xs font-bold text-foreground transition hover:border-primary/60 hover:bg-secondary"
+                  title="My Account"
+                >
+                  <span className="grid size-6 place-items-center rounded-full bg-primary/20 text-sm">
+                    {spiritAnimals[authUser.spirit_animal]?.emoji || "🦊"}
+                  </span>
+                  <span className="max-w-[80px] truncate sm:max-w-[110px]">{authUser.name}</span>
+                </button>
+
+                {showAccountMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl border border-border bg-card p-3 shadow-2xl z-50">
+                    <div className="flex items-center gap-2.5 border-b border-border/60 pb-2.5">
+                      <span className="text-2xl">
+                        {spiritAnimals[authUser.spirit_animal]?.emoji || "🦊"}
+                      </span>
+                      <div className="overflow-hidden">
+                        <p className="font-heading text-sm font-bold truncate">{authUser.name}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">
+                          {cleanQuote(authUser.quote) || "Squad Member"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAccountMenu(false);
+                          const matched = players.find(
+                            (p) => p.display_name.toLowerCase() === authUser.name.toLowerCase(),
+                          );
+                          if (matched) setProfileId(matched.id);
+                          else setTab("players");
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-foreground transition hover:bg-secondary"
+                      >
+                        <User className="size-3.5 text-primary" />
+                        <span>My Player Profile</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAccountMenu(false);
+                          authSignOut();
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-destructive transition hover:bg-destructive/10"
+                      >
+                        <LogOut className="size-3.5" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link
+                to="/auth"
+                className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-purple-500/20 transition hover:brightness-110 active:scale-95"
+              >
+                <LogIn className="size-3.5" />
+                <span className="hidden sm:inline">Sign In</span>
+                <span className="sm:hidden">Login</span>
+              </Link>
+            )}
+          </div>
         </div>
       </header>
       <main className="relative z-10 mx-auto max-w-6xl px-4 py-8 md:px-7">
@@ -761,7 +864,7 @@ function ProfileSheet({
     defaultQuote: "Game night ready",
     badgeBg: "from-primary/20 to-secondary border-border",
   };
-  const quote = player.quote || animalInfo.defaultQuote;
+  const quote = cleanQuote(player.quote) || animalInfo.defaultQuote;
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-end bg-background/85 p-4 backdrop-blur-sm sm:place-items-center">
@@ -871,7 +974,7 @@ function EditPlayerModal({
   const [name, setName] = useState(player.display_name);
   const [animal, setAnimal] = useState(player.spirit_animal);
   const [quote, setQuote] = useState(
-    player.quote || spiritAnimals[player.spirit_animal]?.defaultQuote || "",
+    cleanQuote(player.quote) || spiritAnimals[player.spirit_animal]?.defaultQuote || "",
   );
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -940,11 +1043,17 @@ function EditPlayerModal({
         <Button
           disabled={!name.trim()}
           onClick={() => {
+            const parsed = parseQuoteAuth(player.quote);
+            const finalQuote =
+              quote.trim() || spiritAnimals[animal]?.defaultQuote || "Game night ready";
+            const updatedQuote = parsed.auth
+              ? encodeQuoteAuth(finalQuote, parsed.auth.salt, parsed.auth.hash)
+              : finalQuote;
             save({
               ...player,
               display_name: name.trim(),
               spirit_animal: animal,
-              quote: quote.trim() || spiritAnimals[animal]?.defaultQuote || "Game night ready",
+              quote: updatedQuote,
             });
           }}
           className="mt-6 h-12 w-full rounded-xl bg-primary font-bold text-primary-foreground"
@@ -1162,7 +1271,7 @@ function PlayersView({
               defaultQuote: "Game night ready",
               badgeBg: "from-primary/20 to-secondary border-border",
             };
-            const quote = p.quote || animalInfo.defaultQuote;
+            const quote = cleanQuote(p.quote) || animalInfo.defaultQuote;
 
             return (
               <div
@@ -1347,7 +1456,7 @@ function PlayView({
                 title: p.spirit_animal,
                 defaultQuote: "Game night ready",
               };
-              const quote = p.quote || animalInfo.defaultQuote;
+              const quote = cleanQuote(p.quote) || animalInfo.defaultQuote;
               return (
                 <button
                   key={p.id}
