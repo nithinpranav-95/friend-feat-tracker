@@ -516,11 +516,17 @@ function GameApp() {
       {newGame && (
         <NewGameModal
           close={() => setNewGame(false)}
-          save={(name: string, type: string) => {
+          save={async (name: string, type: string) => {
+            const { data, error } = await supabase
+              .from("custom_games")
+              .insert({ name, scoring_type: type, high_score_wins: true, accent: "lime" })
+              .select()
+              .single();
+            if (error) console.debug("Failed to save game:", error);
             setGames([
               ...games,
               {
-                id: crypto.randomUUID(),
+                id: data?.id ?? crypto.randomUUID(),
                 name,
                 scoring_type: type,
                 high_score_wins: true,
