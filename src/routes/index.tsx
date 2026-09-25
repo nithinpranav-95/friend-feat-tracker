@@ -31,6 +31,7 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -233,56 +234,57 @@ function GameApp() {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<PastSession[]>([]);
 
-  // Hydrate from localStorage once on client
+  // Load shared data from the cloud on mount
   useEffect(() => {
-    try {
-      const savedPlayers = localStorage.getItem("scoreup_players");
-      if (savedPlayers) {
-        const parsed = JSON.parse(savedPlayers);
-        if (Array.isArray(parsed)) {
-          // Remove any preset players from previous version
-          const userOnly = parsed.filter((p: Player) => !p.id.startsWith("p"));
-          setPlayers(userOnly);
-        }
+    let cancelled = false;
+    (async () => {
+      const [playersRes, gamesRes, resultsRes] = await Promise.all([
+        supabase.from("players").select("*").order("created_at"),
+        supabase.from("custom_games").select("*").order("created_at"),
+        supabase.from("game_results").select("*").order("played_at", { ascending: false }),
+      ]);
+      if (cancelled) return;
+      if (playersRes.data) {
+        setPlayers(
+          playersRes.data.map((r) => ({
+            id: r.id,
+            display_name: r.name,
+            spirit_animal: r.spirit_animal,
+            quote: r.quote ?? undefined,
+          })),
+        );
       }
-      const savedGames = localStorage.getItem("scoreup_games");
-      if (savedGames) {
-        const parsed = JSON.parse(savedGames);
-        if (Array.isArray(parsed) && parsed.length > 0) setGames(parsed);
+      if (gamesRes.data && gamesRes.data.length > 0) {
+        setGames([
+          ...demoGames,
+          ...gamesRes.data.map((g) => ({
+            id: g.id,
+            name: g.name,
+            scoring_type: g.scoring_type,
+            high_score_wins: g.high_score_wins,
+            accent: g.accent,
+          })),
+        ]);
       }
-      const savedSessions = localStorage.getItem("scoreup_sessions");
-      if (savedSessions) {
-        const parsed = JSON.parse(savedSessions);
-        if (Array.isArray(parsed)) setSessions(parsed);
+      if (resultsRes.data) {
+        setSessions(
+          resultsRes.data.map((r) => ({
+            id: r.id,
+            gameName: r.game_name,
+            date: new Date(r.played_at).toLocaleDateString(undefined, {
+              day: "numeric",
+              month: "short",
+            }),
+            rounds: r.rounds,
+            results: (r.results as PastSession["results"]) ?? [],
+          })),
+        );
       }
-    } catch (e) {
-      console.debug("Failed to load local storage state:", e);
-    }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("scoreup_players", JSON.stringify(players));
-    } catch (e) {
-      console.debug("Failed to save players to local storage:", e);
-    }
-  }, [players]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("scoreup_games", JSON.stringify(games));
-    } catch (e) {
-      console.debug("Failed to save games to local storage:", e);
-    }
-  }, [games]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("scoreup_sessions", JSON.stringify(sessions));
-    } catch (e) {
-      console.debug("Failed to save sessions to local storage:", e);
-    }
-  }, [sessions]);
 
   function handleSelectGame(game: Game) {
     if (players.length === 0) {
