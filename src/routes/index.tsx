@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import {
+  ArrowUpDown,
   BarChart3,
   Check,
   CirclePlus,
@@ -17,13 +18,10 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Legend,
+  Cell,
+  LabelList,
   Line,
   LineChart,
-  PolarAngleAxis,
-  PolarGrid,
-  Radar,
-  RadarChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -1068,108 +1066,356 @@ function RanksView({
 }
 function StatsView({ players, sessions }: { players: Player[]; sessions: PastSession[] }) {
   const stats = playerStats(players, sessions);
-  const gameNames = [...new Set(sessions.map((s) => s.gameName))].slice(0, 3);
-  const radar = stats.slice(0, 4).map((s) => {
-    const row: Record<string, string | number> = { game: s.name };
-    for (const g of gameNames) {
-      const rows = sessions
-        .filter((x) => x.gameName === g)
-        .flatMap((x) => {
-          const r = x.results.find((y) => y.playerId === s.id);
-          return r ? [r] : [];
-        });
-      row[g] = rows.length
-        ? Math.round((rows.filter((r) => r.rank === 1).length / rows.length) * 100)
-        : 0;
-    }
-    return row;
-  });
-  const maxGames = Math.max(0, ...stats.map((s) => s.scores.length));
-  const trendRows = Array.from({ length: maxGames }, (_, i) => {
-    const row: Record<string, string | number> = { n: `G${i + 1}` };
-    for (const s of stats) if (s.scores[i] !== undefined) row[s.name] = s.scores[i]!;
-    return row;
-  });
-  const lineColors = ["var(--primary)", "var(--mint)", "var(--sun)", "var(--muted-foreground)"];
-  const top = stats.reduce<PlayerStat | null>(
-    (best, s) => (s.games && (!best || s.rate > best.rate) ? s : best),
-    null,
-  );
-  if (sessions.length === 0)
+  const [metric, setMetric] = useState<"rate" | "wins">("rate");
+  const [layout, setLayout] = useState<"columns" | "rows">("columns");
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc" | "alpha">("desc");
+
+  const totalVictories = sessions.length;
+  const squadSize = players.length;
+  const mvp = stats.reduce<PlayerStat | null>((best, s) => {
+    if (!s.games) return best;
+    if (!best) return s;
+    return s.wins > best.wins || (s.wins === best.wins && s.rate > best.rate) ? s : best;
+  }, null);
+
+  if (sessions.length === 0) {
     return (
       <section>
-        <p className="font-bold text-primary">PERFORMANCE LAB</p>
-        <h2 className="mt-1 font-heading text-4xl font-bold">Squad stats</h2>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-2xl font-bold">
+              <span>🏆</span>
+              <h2 className="font-heading text-3xl font-bold md:text-4xl">Squad Stats</h2>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Total game night victories recorded by each player across the squad
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 pt-2 md:pt-0">
+            <div className="rounded-2xl border border-border/80 bg-card/80 px-4 py-2 text-right">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Squad Size
+              </p>
+              <p className="font-heading text-lg font-bold text-foreground">{squadSize} Players</p>
+            </div>
+          </div>
+        </div>
         <EmptyStats label="Charts appear once you finish your first game." />
       </section>
     );
+  }
+
+  const sortedData = [...stats]
+    .sort((a, b) => {
+      if (sortOrder === "desc") {
+        return metric === "rate"
+          ? b.rate - a.rate || b.wins - a.wins || a.name.localeCompare(b.name)
+          : b.wins - a.wins || b.rate - a.rate || a.name.localeCompare(b.name);
+      }
+      if (sortOrder === "asc") {
+        return metric === "rate"
+          ? a.rate - b.rate || a.wins - b.wins || a.name.localeCompare(b.name)
+          : a.wins - b.wins || a.rate - b.rate || a.name.localeCompare(b.name);
+      }
+      return a.name.localeCompare(b.name);
+    })
+    .map((s) => ({
+      ...s,
+      value: metric === "rate" ? s.rate : s.wins,
+      displayLabel: metric === "rate" ? `${s.rate}%` : s.wins > 0 ? `${s.wins} 🏆` : "0",
+    }));
+
+  const BAR_COLORS = [
+    "#EAB308",
+    "#F97316",
+    "#10B981",
+    "#8B5CF6",
+    "#3B82F6",
+    "#EC4899",
+    "#06B6D4",
+    "#F43F5E",
+    "#14B8A6",
+    "#A855F7",
+  ];
+
   return (
-    <section>
-      <p className="font-bold text-primary">PERFORMANCE LAB</p>
-      <h2 className="mt-1 font-heading text-4xl font-bold">Squad stats</h2>
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <Chart title="Wins by player">
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={stats}>
-              <CartesianGrid stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="name" stroke="var(--muted-foreground)" />
-              <YAxis stroke="var(--muted-foreground)" allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="wins" fill="var(--primary)" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Chart>
-        <Chart title="Score trend">
-          <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={trendRows}>
-              <CartesianGrid stroke="var(--border)" />
-              <XAxis dataKey="n" stroke="var(--muted-foreground)" />
-              <YAxis stroke="var(--muted-foreground)" />
-              <Tooltip />
-              <Legend />
-              {stats.slice(0, 4).map((s, i) => (
-                <Line key={s.id} dataKey={s.name} stroke={lineColors[i]} strokeWidth={3} />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        </Chart>
-        <Chart title="Win rate per game (%)">
-          <ResponsiveContainer width="100%" height={300}>
-            <RadarChart data={radar}>
-              <PolarGrid stroke="var(--border)" />
-              <PolarAngleAxis dataKey="game" stroke="var(--muted-foreground)" />
-              <Tooltip />
-              {gameNames.map((g, i) => (
-                <Radar
-                  key={g}
-                  dataKey={g}
-                  stroke={lineColors[i]}
-                  fill={lineColors[i]}
-                  fillOpacity={0.24}
-                />
-              ))}
-            </RadarChart>
-          </ResponsiveContainer>
-        </Chart>
-        <div className="rounded-[1.5rem] border border-border bg-card p-5">
-          <p className="text-sm font-bold text-muted-foreground">TOP WIN RATE</p>
-          <p className="mt-3 font-heading text-5xl font-bold text-primary">{top?.rate ?? 0}%</p>
-          <p className="mt-1 text-lg font-bold">
-            {top?.name ?? "—"} · {top?.streak ?? 0} game streak
-          </p>
-          <div className="mt-6 h-3 overflow-hidden rounded-full bg-secondary">
-            <div className="h-full bg-primary" style={{ width: `${top?.rate ?? 0}%` }} />
+    <section className="space-y-6">
+      {/* Top Header with Badges matching mockup */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <span className="text-3xl">🏆</span>
+            <h2 className="font-heading text-3xl font-bold tracking-tight md:text-4xl">
+              Squad Stats
+            </h2>
           </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Total game night victories recorded by each player across the squad
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+          {mvp && mvp.wins > 0 && (
+            <div className="flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-left shadow-sm">
+              <span className="grid size-9 place-items-center rounded-xl bg-amber-500/20 text-xl">
+                👑
+              </span>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                  Squad MVP
+                </p>
+                <p className="font-heading text-sm font-bold text-foreground">
+                  {mvp.name}{" "}
+                  <span className="font-normal text-muted-foreground">
+                    ({mvp.wins} {mvp.wins === 1 ? "Win" : "Wins"})
+                  </span>
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-2xl border border-border/80 bg-card/90 px-4 py-2.5 text-left shadow-sm">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Total Squad Victories
+            </p>
+            <p className="font-heading text-base font-bold text-primary">
+              {totalVictories} {totalVictories === 1 ? "Win" : "Wins"}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-border/80 bg-card/90 px-4 py-2.5 text-left shadow-sm">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Squad Size
+            </p>
+            <p className="font-heading text-base font-bold text-foreground">{squadSize} Players</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Single Graph Card */}
+      <div className="rounded-[1.75rem] border border-border bg-card p-5 md:p-7 shadow-xl">
+        <div className="flex flex-col gap-4 border-b border-border/60 pb-5 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-400">
+              <BarChart3 className="size-3.5" />
+              <span>{metric === "rate" ? "WIN RATE GRAPH CHART" : "VICTORIES GRAPH CHART"}</span>
+            </div>
+            <h3 className="mt-1 font-heading text-2xl font-bold text-foreground">
+              {metric === "rate" ? "Win Rate by Each Player" : "Total Wins by Each Player"}
+            </h3>
+          </div>
+
+          {/* Controls matching mockup */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center rounded-xl border border-border/60 bg-secondary/80 p-1">
+              <button
+                type="button"
+                onClick={() => setMetric("rate")}
+                className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
+                  metric === "rate"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Win Rate (%)
+              </button>
+              <button
+                type="button"
+                onClick={() => setMetric("wins")}
+                className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
+                  metric === "wins"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Total Wins
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSortOrder((prev) =>
+                  prev === "desc" ? "asc" : prev === "asc" ? "alpha" : "desc",
+                );
+              }}
+              className="flex items-center gap-1.5 rounded-xl border border-border/70 bg-secondary/60 px-3 py-1.5 text-xs font-bold text-foreground hover:bg-secondary transition"
+            >
+              <ArrowUpDown className="size-3.5 text-primary" />
+              <span>
+                {sortOrder === "desc"
+                  ? `Sorted by ${metric === "rate" ? "Win Rate" : "Wins"}`
+                  : sortOrder === "asc"
+                    ? "Lowest first"
+                    : "Alphabetical"}
+              </span>
+            </button>
+
+            <div className="flex items-center rounded-xl border border-border/60 bg-secondary/80 p-1">
+              <button
+                type="button"
+                onClick={() => setLayout("columns")}
+                className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
+                  layout === "columns"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Columns
+              </button>
+              <button
+                type="button"
+                onClick={() => setLayout("rows")}
+                className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
+                  layout === "rows"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Rows
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 w-full">
+          {layout === "columns" ? (
+            <ResponsiveContainer width="100%" height={380}>
+              <BarChart data={sortedData} margin={{ top: 28, right: 16, left: -10, bottom: 20 }}>
+                <CartesianGrid
+                  stroke="var(--border)"
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  opacity={0.6}
+                />
+                <XAxis
+                  dataKey="name"
+                  stroke="var(--muted-foreground)"
+                  tick={{ fontSize: 13, fontWeight: 600 }}
+                  tickLine={false}
+                  dy={8}
+                />
+                <YAxis
+                  stroke="var(--muted-foreground)"
+                  tick={{ fontSize: 12 }}
+                  tickLine={false}
+                  domain={metric === "rate" ? [0, 100] : [0, "auto"]}
+                  tickFormatter={metric === "rate" ? (v) => `${v}%` : undefined}
+                  allowDecimals={false}
+                />
+                <Tooltip content={<CustomStatsTooltip />} />
+                <Bar dataKey="value" radius={[10, 10, 0, 0]} minPointSize={4}>
+                  <LabelList
+                    dataKey="displayLabel"
+                    position="top"
+                    fill="currentColor"
+                    className="text-xs font-black fill-foreground"
+                    offset={8}
+                  />
+                  {sortedData.map((entry, index) => (
+                    <Cell
+                      key={entry.id}
+                      fill={
+                        entry.value === 0
+                          ? "rgba(120, 120, 140, 0.25)"
+                          : BAR_COLORS[index % BAR_COLORS.length]
+                      }
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <ResponsiveContainer width="100%" height={Math.max(260, sortedData.length * 52)}>
+              <BarChart
+                data={sortedData}
+                layout="vertical"
+                margin={{ top: 10, right: 48, left: 24, bottom: 10 }}
+              >
+                <CartesianGrid
+                  stroke="var(--border)"
+                  strokeDasharray="3 3"
+                  horizontal={false}
+                  opacity={0.6}
+                />
+                <XAxis
+                  type="number"
+                  stroke="var(--muted-foreground)"
+                  domain={metric === "rate" ? [0, 100] : [0, "auto"]}
+                  tickFormatter={metric === "rate" ? (v) => `${v}%` : undefined}
+                  allowDecimals={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  stroke="var(--muted-foreground)"
+                  tick={{ fontSize: 13, fontWeight: 600 }}
+                  tickLine={false}
+                />
+                <Tooltip content={<CustomStatsTooltip />} />
+                <Bar dataKey="value" radius={[0, 10, 10, 0]} minPointSize={4}>
+                  <LabelList
+                    dataKey="displayLabel"
+                    position="right"
+                    fill="currentColor"
+                    className="text-xs font-black fill-foreground"
+                    offset={8}
+                  />
+                  {sortedData.map((entry, index) => (
+                    <Cell
+                      key={entry.id}
+                      fill={
+                        entry.value === 0
+                          ? "rgba(120, 120, 140, 0.25)"
+                          : BAR_COLORS[index % BAR_COLORS.length]
+                      }
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </section>
   );
 }
-function Chart({ title, children }: { title: string; children: React.ReactNode }) {
+
+function CustomStatsTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: PlayerStat & { value: number; displayLabel: string } }>;
+}) {
+  if (!active || !payload || !payload.length) return null;
+  const data = payload[0].payload;
   return (
-    <div className="rounded-[1.5rem] border border-border bg-card p-5">
-      <h3 className="mb-4 font-heading text-xl font-bold">{title}</h3>
-      {children}
+    <div className="rounded-2xl border border-border bg-card/95 p-3.5 shadow-xl backdrop-blur-sm">
+      <div className="flex items-center gap-2">
+        <span className="text-2xl">{animals[data.animal] ?? "🦊"}</span>
+        <div>
+          <p className="font-heading text-base font-bold text-foreground">{data.name}</p>
+          <p className="text-xs text-muted-foreground">
+            {data.games} {data.games === 1 ? "game" : "games"} played
+          </p>
+        </div>
+      </div>
+      <div className="mt-2.5 grid grid-cols-2 gap-2 border-t border-border/60 pt-2 text-xs">
+        <div>
+          <span className="text-muted-foreground">Win rate: </span>
+          <span className="font-bold text-primary">{data.rate}%</span>
+        </div>
+        <div>
+          <span className="text-muted-foreground">Wins: </span>
+          <span className="font-bold text-foreground">{data.wins}</span>
+        </div>
+        <div className="col-span-2">
+          <span className="text-muted-foreground">Favourite: </span>
+          <span className="font-bold text-foreground">{data.favourite}</span>
+        </div>
+      </div>
     </div>
   );
 }
