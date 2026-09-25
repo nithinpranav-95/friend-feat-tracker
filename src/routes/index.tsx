@@ -917,7 +917,7 @@ function PlayersView({
           </div>
           <div>
             <h2 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              Friend Profiles & Spirit Animals
+              Profiles
             </h2>
             <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
               Persistent profiles accumulate career stats, trophies, and win rates across all game
