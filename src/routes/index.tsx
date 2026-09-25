@@ -8,9 +8,12 @@ import {
   Gamepad2,
   History,
   Minus,
+  Pencil,
   Play,
   Plus,
+  Trash2,
   Trophy,
+  UserPlus,
   Users,
   X,
 } from "lucide-react";
@@ -49,7 +52,7 @@ export const Route = createFileRoute("/")({
   component: ScoreUp,
 });
 
-type Tab = "play" | "ranks" | "stats" | "history";
+type Tab = "play" | "players" | "ranks" | "stats" | "history";
 type Game = {
   id: string;
   name: string;
@@ -57,7 +60,12 @@ type Game = {
   high_score_wins: boolean;
   accent: string;
 };
-type Player = { id: string; display_name: string; spirit_animal: string };
+type Player = {
+  id: string;
+  display_name: string;
+  spirit_animal: string;
+  quote?: string;
+};
 type LivePlayer = Player & { score: number };
 type PastSession = {
   id: string;
@@ -66,16 +74,92 @@ type PastSession = {
   rounds: number;
   results: { playerId: string; name: string; score: number; rank: number }[];
 };
-const animals: Record<string, string> = {
-  fox: "🦊",
-  owl: "🦉",
-  frog: "🐸",
-  bear: "🐻",
-  tiger: "🐯",
-  panda: "🐼",
-  octopus: "🐙",
-  turtle: "🐢",
+
+type AnimalInfo = {
+  emoji: string;
+  title: string;
+  defaultQuote: string;
+  badgeBg: string;
 };
+
+const spiritAnimals: Record<string, AnimalInfo> = {
+  lion: {
+    emoji: "🦁",
+    title: "Brave Lion",
+    defaultQuote: "Bold & fearless",
+    badgeBg: "from-amber-500/25 to-orange-500/10 border-orange-500/30 text-orange-400",
+  },
+  fox: {
+    emoji: "🦊",
+    title: "Clever Fox",
+    defaultQuote: "Tactical & cunning",
+    badgeBg: "from-orange-500/25 to-amber-500/10 border-amber-500/30 text-amber-400",
+  },
+  panda: {
+    emoji: "🐼",
+    title: "Chill Panda",
+    defaultQuote: "Calm under pressure",
+    badgeBg: "from-slate-400/25 to-zinc-500/10 border-slate-400/30 text-slate-300",
+  },
+  owl: {
+    emoji: "🦉",
+    title: "Wise Owl",
+    defaultQuote: "Master strategist",
+    badgeBg: "from-purple-500/25 to-indigo-500/10 border-purple-500/30 text-purple-400",
+  },
+  dragon: {
+    emoji: "🐲",
+    title: "Mythic Dragon",
+    defaultQuote: "High stakes legend",
+    badgeBg: "from-cyan-500/25 to-blue-500/10 border-cyan-500/30 text-cyan-400",
+  },
+  chameleon: {
+    emoji: "🦎",
+    title: "Chameleon",
+    defaultQuote: "Adapts to any game",
+    badgeBg: "from-teal-500/25 to-emerald-500/10 border-teal-500/30 text-teal-400",
+  },
+  tiger: {
+    emoji: "🐯",
+    title: "Fierce Tiger",
+    defaultQuote: "Eyes on the prize",
+    badgeBg: "from-yellow-500/25 to-amber-500/10 border-yellow-500/30 text-yellow-400",
+  },
+  bear: {
+    emoji: "🐻",
+    title: "Grizzly Bear",
+    defaultQuote: "Unstoppable force",
+    badgeBg: "from-amber-800/25 to-stone-700/10 border-amber-700/30 text-amber-300",
+  },
+  frog: {
+    emoji: "🐸",
+    title: "Lucky Frog",
+    defaultQuote: "Leaping to victory",
+    badgeBg: "from-emerald-500/25 to-green-500/10 border-emerald-500/30 text-emerald-400",
+  },
+  octopus: {
+    emoji: "🐙",
+    title: "Galaxy Octopus",
+    defaultQuote: "Eight steps ahead",
+    badgeBg: "from-rose-500/25 to-pink-500/10 border-rose-500/30 text-rose-400",
+  },
+  turtle: {
+    emoji: "🐢",
+    title: "Zen Turtle",
+    defaultQuote: "Slow and steady wins",
+    badgeBg: "from-green-500/25 to-teal-500/10 border-teal-500/30 text-green-400",
+  },
+  wolf: {
+    emoji: "🐺",
+    title: "Lone Wolf",
+    defaultQuote: "Quietly dominant",
+    badgeBg: "from-blue-500/25 to-indigo-500/10 border-blue-500/30 text-blue-400",
+  },
+};
+
+const animals: Record<string, string> = Object.fromEntries(
+  Object.entries(spiritAnimals).map(([k, v]) => [k, v.emoji]),
+);
 const demoPlayers: Player[] = [];
 const demoGames: Game[] = [
   { id: "sevens", name: "Sevens", scoring_type: "points", high_score_wins: false, accent: "lime" },
@@ -85,6 +169,52 @@ const demoGames: Game[] = [
 
 function ScoreUp() {
   return <GameApp />;
+}
+
+type PlayerStat = {
+  id: string;
+  name: string;
+  animal: string;
+  games: number;
+  wins: number;
+  rate: number;
+  points: number;
+  streak: number;
+  favourite: string;
+  scores: number[];
+};
+
+function playerStats(players: Player[], sessions: PastSession[]): PlayerStat[] {
+  return players
+    .map((p) => {
+      const rows = sessions.flatMap((s) => {
+        const r = s.results.find((x) => x.playerId === p.id);
+        return r ? [{ gameName: s.gameName, score: r.score, rank: r.rank }] : [];
+      });
+      const wins = rows.filter((r) => r.rank === 1).length;
+      let streak = 0;
+      for (const r of rows) {
+        if (r.rank === 1) streak++;
+        else break;
+      }
+      const counts = rows.reduce<Record<string, number>>(
+        (acc, r) => ({ ...acc, [r.gameName]: (acc[r.gameName] ?? 0) + 1 }),
+        {},
+      );
+      return {
+        id: p.id,
+        name: p.display_name,
+        animal: p.spirit_animal,
+        games: rows.length,
+        wins,
+        rate: rows.length ? Math.round((wins / rows.length) * 100) : 0,
+        points: rows.reduce((sum, r) => sum + r.score, 0),
+        streak,
+        favourite: Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "—",
+        scores: [...rows].reverse().map((r) => r.score),
+      };
+    })
+    .sort((a, b) => b.wins - a.wins || b.points - a.points || a.name.localeCompare(b.name));
 }
 
 function GameApp() {
@@ -99,6 +229,7 @@ function GameApp() {
   const [celebrate, setCelebrate] = useState(false);
   const [newGame, setNewGame] = useState(false);
   const [addPlayer, setAddPlayer] = useState(false);
+  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<PastSession[]>([]);
 
@@ -162,6 +293,33 @@ function GameApp() {
     setSetupGame(game);
   }
 
+  function handleAddPlayer(name: string, animal: string, quote?: string) {
+    const defaultQuote = spiritAnimals[animal]?.defaultQuote || "Bold & fearless";
+    const newP: Player = {
+      id: crypto.randomUUID(),
+      display_name: name,
+      spirit_animal: animal,
+      quote: quote?.trim() || defaultQuote,
+    };
+    setPlayers((prev) => [...prev, newP]);
+    setAddPlayer(false);
+    if (pendingGame) {
+      setSetupGame(pendingGame);
+      setPendingGame(null);
+    }
+  }
+
+  function handleUpdatePlayer(updated: Player) {
+    setPlayers((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    setEditingPlayer(null);
+  }
+
+  function handleDeletePlayer(id: string) {
+    setPlayers((prev) => prev.filter((p) => p.id !== id));
+    setEditingPlayer(null);
+    if (profileId === id) setProfileId(null);
+  }
+
   function startSessionWithPlayers(game: Game, selectedPlayers: Player[]) {
     setLiveGame(game);
     setLivePlayers(selectedPlayers.map((p) => ({ ...p, score: 0 })));
@@ -210,6 +368,7 @@ function GameApp() {
   }
   const nav = [
     { id: "play", icon: Gamepad2, label: "Play" },
+    { id: "players", icon: Users, label: "Players" },
     { id: "ranks", icon: Trophy, label: "Ranks" },
     { id: "stats", icon: BarChart3, label: "Stats" },
     { id: "history", icon: History, label: "History" },
@@ -234,17 +393,51 @@ function GameApp() {
     <div className="min-h-screen bg-background pb-24 text-foreground">
       {celebrate && <Confetti />}
       <header className="border-b border-border">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 md:px-7">
-          <div>
-            <p className="text-sm font-bold text-primary">GAME NIGHT</p>
-            <h1 className="font-heading text-3xl font-bold">ScoreUp</h1>
-          </div>
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 md:px-7">
           <button
-            onClick={() => setAddPlayer(true)}
-            aria-label="Add player"
-            className="grid size-11 place-items-center rounded-full bg-secondary"
+            type="button"
+            onClick={() => setTab("play")}
+            className="flex items-center gap-2.5 text-left transition hover:opacity-90"
           >
-            <Users />
+            <span className="grid size-10 place-items-center rounded-xl bg-primary text-xl font-bold text-primary-foreground shadow-md">
+              🎲
+            </span>
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-primary">
+                Game Night
+              </p>
+              <h1 className="font-heading text-2xl font-bold leading-tight">ScoreUp</h1>
+            </div>
+          </button>
+
+          {/* Desktop Navigation matching mockup */}
+          <div className="hidden items-center gap-1 rounded-2xl border border-border/80 bg-secondary/40 p-1 md:flex">
+            {nav.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setTab(item.id)}
+                className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-bold transition ${
+                  tab === item.id
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                }`}
+              >
+                <item.icon className="size-4" />
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setTab("players")}
+            aria-label="Friends and Players"
+            className={`grid size-11 place-items-center rounded-full transition ${
+              tab === "players"
+                ? "bg-primary text-primary-foreground shadow-md"
+                : "bg-secondary text-foreground hover:bg-secondary/80"
+            }`}
+          >
+            <Users className="size-5" />
           </button>
         </div>
       </header>
@@ -257,6 +450,16 @@ function GameApp() {
             openNew={() => setNewGame(true)}
             openPlayer={setProfileId}
             openAddPlayer={() => setAddPlayer(true)}
+            goToPlayers={() => setTab("players")}
+          />
+        )}
+        {tab === "players" && (
+          <PlayersView
+            players={players}
+            sessions={sessions}
+            openPlayer={setProfileId}
+            openEditPlayer={(p) => setEditingPlayer(p)}
+            openAddPlayer={() => setAddPlayer(true)}
           />
         )}
         {tab === "ranks" && (
@@ -265,16 +468,18 @@ function GameApp() {
         {tab === "stats" && <StatsView players={players} sessions={sessions} />}
         {tab === "history" && <HistoryView sessions={sessions} />}
       </main>
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 backdrop-blur">
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 backdrop-blur md:hidden">
         <div className="mx-auto flex max-w-xl justify-around px-3 py-2">
           {nav.map((item) => (
             <button
               key={item.id}
               onClick={() => setTab(item.id)}
-              className={`flex min-w-16 flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold ${tab === item.id ? "text-primary" : "text-muted-foreground"}`}
+              className={`flex min-w-14 flex-col items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-bold transition ${
+                tab === item.id ? "text-primary" : "text-muted-foreground hover:text-foreground"
+              }`}
             >
-              <item.icon className="size-6" />
-              {item.label}
+              <item.icon className="size-5" />
+              <span>{item.label}</span>
             </button>
           ))}
         </div>
@@ -312,23 +517,24 @@ function GameApp() {
             setAddPlayer(false);
             setPendingGame(null);
           }}
-          save={(name: string, animal: string) => {
-            const newP = {
-              id: crypto.randomUUID(),
-              display_name: name,
-              spirit_animal: animal,
-            };
-            setPlayers([...players, newP]);
-            setAddPlayer(false);
-            if (pendingGame) {
-              setSetupGame(pendingGame);
-              setPendingGame(null);
-            }
-          }}
+          save={handleAddPlayer}
+        />
+      )}
+      {editingPlayer && (
+        <EditPlayerModal
+          player={editingPlayer}
+          close={() => setEditingPlayer(null)}
+          save={handleUpdatePlayer}
+          remove={handleDeletePlayer}
         />
       )}
       {openProfile && (
-        <ProfileSheet player={openProfile} sessions={sessions} close={() => setProfileId(null)} />
+        <ProfileSheet
+          player={openProfile}
+          sessions={sessions}
+          close={() => setProfileId(null)}
+          onEdit={(p) => setEditingPlayer(p)}
+        />
       )}
     </div>
   );
@@ -338,10 +544,12 @@ function ProfileSheet({
   player,
   sessions,
   close,
+  onEdit,
 }: {
   player: Player;
   sessions: PastSession[];
   close: () => void;
+  onEdit?: (player: Player) => void;
 }) {
   const mine = sessions.filter((s) => s.results.some((r) => r.playerId === player.id));
   const rows = mine.map((s) => {
@@ -364,22 +572,47 @@ function ProfileSheet({
     else break;
   }
   const trend = [...rows].reverse().map((r, i) => ({ n: `G${i + 1}`, score: r.score }));
+  const animalInfo = spiritAnimals[player.spirit_animal] ?? {
+    emoji: animals[player.spirit_animal] ?? "🦊",
+    title: player.spirit_animal,
+    defaultQuote: "Game night ready",
+    badgeBg: "from-primary/20 to-secondary border-border",
+  };
+  const quote = player.quote || animalInfo.defaultQuote;
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-end bg-background/85 p-4 backdrop-blur-sm sm:place-items-center">
-      <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-[1.5rem] border border-border bg-card p-6">
+      <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-[1.5rem] border border-border bg-card p-6 shadow-2xl">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <span className="animal-bob inline-block text-5xl">
-              {animals[player.spirit_animal] ?? "🦊"}
-            </span>
+            <span className="animal-bob inline-block text-5xl">{animalInfo.emoji}</span>
             <div>
               <h2 className="font-heading text-3xl font-bold">{player.display_name}</h2>
-              <p className="text-sm text-muted-foreground">{rows.length} games played</p>
+              <p className="text-sm font-semibold text-primary">
+                {animalInfo.emoji} {animalInfo.title}
+              </p>
+              <p className="mt-0.5 text-xs italic text-muted-foreground">"{quote}"</p>
+              <p className="mt-1 text-xs text-muted-foreground">{rows.length} games played</p>
             </div>
           </div>
-          <Button onClick={close} variant="ghost" size="icon" aria-label="Close profile">
-            <X />
-          </Button>
+          <div className="flex items-center gap-1">
+            {onEdit && (
+              <Button
+                onClick={() => {
+                  close();
+                  onEdit(player);
+                }}
+                variant="ghost"
+                size="icon"
+                aria-label="Edit profile"
+              >
+                <Pencil className="size-4" />
+              </Button>
+            )}
+            <Button onClick={close} variant="ghost" size="icon" aria-label="Close profile">
+              <X />
+            </Button>
+          </div>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-3">
           {[
@@ -441,56 +674,394 @@ function ProfileSheet({
   );
 }
 
+function EditPlayerModal({
+  player,
+  close,
+  save,
+  remove,
+}: {
+  player: Player;
+  close: () => void;
+  save: (updated: Player) => void;
+  remove: (id: string) => void;
+}) {
+  const [name, setName] = useState(player.display_name);
+  const [animal, setAnimal] = useState(player.spirit_animal);
+  const [quote, setQuote] = useState(
+    player.quote || spiritAnimals[player.spirit_animal]?.defaultQuote || "",
+  );
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  function handleSelectAnimal(key: string) {
+    setAnimal(key);
+    const prevDefault = spiritAnimals[animal]?.defaultQuote;
+    if (!quote || quote === prevDefault) {
+      setQuote(spiritAnimals[key]?.defaultQuote || "");
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-end bg-background/85 p-4 backdrop-blur-sm sm:place-items-center">
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[1.5rem] border border-border bg-card p-6 shadow-2xl">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl">{spiritAnimals[animal]?.emoji ?? "🦊"}</span>
+            <h2 className="font-heading text-2xl font-bold">Edit Friend Profile</h2>
+          </div>
+          <Button onClick={close} variant="ghost" size="icon" aria-label="Close">
+            <X />
+          </Button>
+        </div>
+
+        <label htmlFor="edit-player-name" className="mt-5 block text-sm font-bold">
+          Friend Name
+        </label>
+        <input
+          id="edit-player-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="mt-2 h-12 w-full rounded-xl border border-border bg-secondary px-4 outline-none focus:border-primary"
+          placeholder="e.g. Jordan"
+        />
+
+        <p className="mt-4 text-sm font-bold">Spirit Animal</p>
+        <div className="mt-2 grid max-h-48 grid-cols-3 gap-2 overflow-y-auto pr-1">
+          {Object.entries(spiritAnimals).map(([key, info]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => handleSelectAnimal(key)}
+              className={`flex flex-col items-center gap-1 rounded-xl p-2.5 text-center transition ${
+                animal === key
+                  ? "bg-primary font-bold text-primary-foreground shadow-md"
+                  : "bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
+              }`}
+            >
+              <span className="text-2xl">{info.emoji}</span>
+              <span className="line-clamp-1 text-[11px] leading-tight">{info.title}</span>
+            </button>
+          ))}
+        </div>
+
+        <label htmlFor="edit-player-quote" className="mt-4 block text-sm font-bold">
+          Catchphrase / Quote
+        </label>
+        <input
+          id="edit-player-quote"
+          value={quote}
+          onChange={(e) => setQuote(e.target.value)}
+          className="mt-2 h-12 w-full rounded-xl border border-border bg-secondary px-4 italic outline-none focus:border-primary"
+          placeholder='e.g. "Bold & fearless"'
+        />
+
+        <Button
+          disabled={!name.trim()}
+          onClick={() => {
+            save({
+              ...player,
+              display_name: name.trim(),
+              spirit_animal: animal,
+              quote: quote.trim() || spiritAnimals[animal]?.defaultQuote || "Game night ready",
+            });
+          }}
+          className="mt-6 h-12 w-full rounded-xl bg-primary font-bold text-primary-foreground"
+        >
+          Save Changes
+        </Button>
+
+        <div className="mt-4 border-t border-border pt-4">
+          {!confirmDelete ? (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="flex w-full items-center justify-center gap-2 py-1 text-xs font-semibold text-destructive/80 transition hover:text-destructive"
+            >
+              <Trash2 className="size-3.5" /> Remove {player.display_name} from squad
+            </button>
+          ) : (
+            <div className="flex items-center justify-between rounded-xl border border-destructive/20 bg-destructive/10 p-3">
+              <span className="text-xs font-semibold text-destructive">Are you sure?</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  className="rounded-lg px-2.5 py-1 text-xs font-bold text-muted-foreground hover:text-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => remove(player.id)}
+                  className="rounded-lg bg-destructive px-3 py-1 text-xs font-bold text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Yes, Remove
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AddPlayerModal({
   close,
   save,
 }: {
   close: () => void;
-  save: (name: string, animal: string) => void;
+  save: (name: string, animal: string, quote?: string) => void;
 }) {
   const [name, setName] = useState("");
-  const [animal, setAnimal] = useState("fox");
+  const [animal, setAnimal] = useState("lion");
+  const [quote, setQuote] = useState(spiritAnimals.lion.defaultQuote);
+
+  function handleSelectAnimal(key: string) {
+    setAnimal(key);
+    const prevDefault = spiritAnimals[animal]?.defaultQuote;
+    if (!quote || quote === prevDefault) {
+      setQuote(spiritAnimals[key]?.defaultQuote || "");
+    }
+  }
+
   return (
-    <div className="fixed inset-0 z-50 grid place-items-end bg-background/80 p-4 backdrop-blur-sm sm:place-items-center">
-      <div className="w-full max-w-md rounded-[1.5rem] border border-border bg-card p-6">
+    <div className="fixed inset-0 z-50 grid place-items-end bg-background/85 p-4 backdrop-blur-sm sm:place-items-center">
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[1.5rem] border border-border bg-card p-6 shadow-2xl">
         <div className="flex items-center justify-between">
-          <h2 className="font-heading text-2xl font-bold">Add a player</h2>
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl">{spiritAnimals[animal]?.emoji ?? "🦁"}</span>
+            <h2 className="font-heading text-2xl font-bold">Add Friend Profile</h2>
+          </div>
           <Button onClick={close} variant="ghost" size="icon" aria-label="Close">
             <X />
           </Button>
         </div>
+
         <label htmlFor="player-name" className="mt-5 block text-sm font-bold">
-          Name
+          Friend Name
         </label>
         <input
           id="player-name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="mt-2 h-12 w-full rounded-xl border border-border bg-secondary px-4 outline-none focus:border-primary"
-          placeholder="Who's joining?"
+          placeholder="e.g. Jordan, Alex, Sam…"
+          autoFocus
         />
-        <p className="mt-5 text-sm font-bold">Spirit animal</p>
-        <div className="mt-2 grid grid-cols-4 gap-2">
-          {Object.entries(animals).map(([key, emoji]) => (
+
+        <p className="mt-4 text-sm font-bold">Spirit Animal</p>
+        <div className="mt-2 grid max-h-48 grid-cols-3 gap-2 overflow-y-auto pr-1">
+          {Object.entries(spiritAnimals).map(([key, info]) => (
             <button
               key={key}
-              aria-label={key}
-              onClick={() => setAnimal(key)}
-              className={`rounded-xl py-3 text-3xl ${animal === key ? "bg-primary" : "bg-secondary"}`}
+              type="button"
+              onClick={() => handleSelectAnimal(key)}
+              className={`flex flex-col items-center gap-1 rounded-xl p-2.5 text-center transition ${
+                animal === key
+                  ? "bg-primary font-bold text-primary-foreground shadow-md"
+                  : "bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
+              }`}
             >
-              {emoji}
+              <span className="text-2xl">{info.emoji}</span>
+              <span className="line-clamp-1 text-[11px] leading-tight">{info.title}</span>
             </button>
           ))}
         </div>
+
+        <label htmlFor="player-quote" className="mt-4 block text-sm font-bold">
+          Catchphrase / Quote
+        </label>
+        <input
+          id="player-quote"
+          value={quote}
+          onChange={(e) => setQuote(e.target.value)}
+          className="mt-2 h-12 w-full rounded-xl border border-border bg-secondary px-4 italic outline-none focus:border-primary"
+          placeholder='e.g. "Bold & fearless"'
+        />
+
         <Button
           disabled={!name.trim()}
-          onClick={() => save(name.trim(), animal)}
-          className="mt-6 h-12 w-full rounded-xl bg-primary text-primary-foreground"
+          onClick={() => save(name.trim(), animal, quote.trim())}
+          className="mt-6 h-12 w-full rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600 font-bold text-white shadow-lg shadow-purple-500/20 hover:brightness-110"
         >
-          Add player
+          Add Friend to Squad
         </Button>
       </div>
     </div>
+  );
+}
+
+function PlayersView({
+  players,
+  sessions,
+  openPlayer,
+  openEditPlayer,
+  openAddPlayer,
+}: {
+  players: Player[];
+  sessions: PastSession[];
+  openPlayer: (id: string) => void;
+  openEditPlayer: (player: Player) => void;
+  openAddPlayer: () => void;
+}) {
+  const statsMap = new Map<string, PlayerStat>();
+  playerStats(players, sessions).forEach((s) => statsMap.set(s.id, s));
+
+  return (
+    <section className="space-y-6">
+      {/* Title Header matching mockup */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3.5">
+          <div className="grid size-12 place-items-center rounded-2xl border border-primary/30 bg-primary/20 text-primary shadow-sm">
+            <Users className="size-6" />
+          </div>
+          <div>
+            <h2 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              Friend Profiles & Spirit Animals
+            </h2>
+            <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
+              Persistent profiles accumulate career stats, trophies, and win rates across all game
+              nights
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={openAddPlayer}
+          className="inline-flex self-start items-center justify-center gap-2 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-purple-500/20 transition hover:brightness-110 hover:shadow-purple-500/30 active:scale-95 sm:self-auto"
+        >
+          <UserPlus className="size-4" />
+          <span>Add Friend</span>
+        </button>
+      </div>
+
+      {players.length === 0 ? (
+        <div className="mt-6 flex flex-col items-center justify-center rounded-[1.5rem] border border-dashed border-border bg-card/60 p-12 text-center">
+          <div className="grid size-16 place-items-center rounded-2xl border border-primary/30 bg-primary/10 text-3xl">
+            👥
+          </div>
+          <h3 className="mt-4 font-heading text-2xl font-bold">No friend profiles yet</h3>
+          <p className="mt-1.5 max-w-md text-sm text-muted-foreground">
+            Create profiles with spirit animals, nicknames, and catchphrases. Career stats, win
+            rates, and trophies will accumulate as you play games.
+          </p>
+          <button
+            type="button"
+            onClick={openAddPlayer}
+            className="mt-6 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600 px-6 py-3 font-bold text-white shadow-lg shadow-purple-500/20 hover:brightness-110"
+          >
+            <UserPlus className="size-4" />
+            <span>Add Your First Friend</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {players.map((p) => {
+            const stat = statsMap.get(p.id) ?? {
+              id: p.id,
+              name: p.display_name,
+              animal: p.spirit_animal,
+              games: 0,
+              wins: 0,
+              rate: 0,
+              points: 0,
+              streak: 0,
+              favourite: "—",
+              scores: [],
+            };
+            const animalInfo = spiritAnimals[p.spirit_animal] ?? {
+              emoji: animals[p.spirit_animal] ?? "🦊",
+              title: p.spirit_animal,
+              defaultQuote: "Game night ready",
+              badgeBg: "from-primary/20 to-secondary border-border",
+            };
+            const quote = p.quote || animalInfo.defaultQuote;
+
+            return (
+              <div
+                key={p.id}
+                onClick={() => openPlayer(p.id)}
+                className="group relative flex cursor-pointer flex-col justify-between rounded-[1.25rem] border border-border/80 bg-card p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-primary/60 hover:shadow-lg"
+              >
+                <div>
+                  {/* Card Header: Avatar, Name & Spirit Animal, Edit Pencil */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3.5">
+                      <div
+                        className={`grid size-14 place-items-center rounded-2xl border bg-gradient-to-br ${animalInfo.badgeBg} shadow-inner`}
+                      >
+                        <span className="text-3xl filter drop-shadow-sm">{animalInfo.emoji}</span>
+                      </div>
+                      <div>
+                        <h3 className="font-heading text-xl font-bold text-foreground transition-colors group-hover:text-primary">
+                          {p.display_name}
+                        </h3>
+                        <p className="mt-0.5 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                          <span>{animalInfo.emoji}</span>
+                          <span>{animalInfo.title}</span>
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label={`Edit ${p.display_name}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditPlayer(p);
+                      }}
+                      className="grid size-8 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                    >
+                      <Pencil className="size-4" />
+                    </button>
+                  </div>
+
+                  {/* Catchphrase quote pill */}
+                  <div className="mt-3.5 rounded-xl border border-border/40 bg-secondary/50 px-3.5 py-2 text-center text-xs italic font-medium text-muted-foreground">
+                    "{quote}"
+                  </div>
+
+                  {/* 3 Stats Columns */}
+                  <div className="mt-4 grid grid-cols-3 border-y border-border/50 py-3 text-center">
+                    <div>
+                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                        PLAYED
+                      </p>
+                      <p className="mt-1 font-heading text-xl font-bold text-foreground">
+                        {stat.games}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                        VICTORIES
+                      </p>
+                      <p className="mt-1 font-heading text-xl font-bold text-amber-400">
+                        {stat.wins}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                        WIN RATE
+                      </p>
+                      <p className="mt-1 font-heading text-xl font-bold text-emerald-400">
+                        {stat.rate}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer: All-Time Score */}
+                <div className="mt-3.5 flex items-center justify-between pt-1 text-xs">
+                  <span className="font-medium text-muted-foreground">All-Time Score</span>
+                  <span className="font-heading text-sm font-bold text-indigo-300">
+                    {stat.points} pts
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -501,6 +1072,7 @@ function PlayView({
   openNew,
   openPlayer,
   openAddPlayer,
+  goToPlayers,
 }: {
   games: Game[];
   players: Player[];
@@ -508,6 +1080,7 @@ function PlayView({
   openNew: () => void;
   openPlayer: (id: string) => void;
   openAddPlayer: () => void;
+  goToPlayers?: () => void;
 }) {
   return (
     <>
@@ -557,7 +1130,7 @@ function PlayView({
           <Button
             onClick={openAddPlayer}
             variant="outline"
-            className="rounded-xl border-primary/40 text-primary hover:bg-primary/10 font-bold"
+            className="rounded-xl border-primary/40 font-bold text-primary hover:bg-primary/10"
           >
             <Plus className="mr-1.5 size-4" /> Add player
           </Button>
@@ -579,35 +1152,51 @@ function PlayView({
           </div>
         ) : (
           <div className="mt-5 space-y-2.5">
-            {players.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => openPlayer(p.id)}
-                className="flex w-full items-center justify-between rounded-2xl border border-border bg-card p-3.5 text-left transition hover:-translate-y-0.5 hover:border-primary hover:bg-secondary/40"
-              >
-                <div className="flex items-center gap-3.5">
-                  <span className="animal-bob inline-block text-3xl">
-                    {animals[p.spirit_animal] ?? "🦊"}
-                  </span>
-                  <div>
-                    <p className="font-heading text-lg font-bold text-foreground">
-                      {p.display_name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Spirit animal: {p.spirit_animal} · Tap to view profile
-                    </p>
+            {players.map((p) => {
+              const animalInfo = spiritAnimals[p.spirit_animal] ?? {
+                emoji: animals[p.spirit_animal] ?? "🦊",
+                title: p.spirit_animal,
+                defaultQuote: "Game night ready",
+              };
+              const quote = p.quote || animalInfo.defaultQuote;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => openPlayer(p.id)}
+                  className="flex w-full items-center justify-between rounded-2xl border border-border bg-card p-3.5 text-left transition hover:-translate-y-0.5 hover:border-primary hover:bg-secondary/40"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <span className="animal-bob inline-block text-3xl">{animalInfo.emoji}</span>
+                    <div>
+                      <p className="font-heading text-lg font-bold text-foreground">
+                        {p.display_name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {animalInfo.title} · <span className="italic">"{quote}"</span>
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <span className="text-xs font-bold text-primary">View profile →</span>
-              </button>
-            ))}
+                  <span className="text-xs font-bold text-primary">View profile →</span>
+                </button>
+              );
+            })}
 
-            <button
-              onClick={openAddPlayer}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-muted-foreground/30 bg-card/40 p-3.5 text-center font-bold text-primary transition hover:border-primary hover:bg-secondary/60"
-            >
-              <Plus className="size-4" /> Add another player
-            </button>
+            <div className="flex flex-col gap-2 pt-1 sm:flex-row">
+              <button
+                onClick={openAddPlayer}
+                className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-dashed border-muted-foreground/30 bg-card/40 p-3.5 text-center font-bold text-primary transition hover:border-primary hover:bg-secondary/60"
+              >
+                <Plus className="size-4" /> Add another player
+              </button>
+              {goToPlayers && (
+                <button
+                  onClick={goToPlayers}
+                  className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-secondary/60 px-5 py-3.5 text-center text-xs font-bold text-foreground transition hover:border-primary hover:bg-secondary"
+                >
+                  <Users className="size-4 text-primary" /> View all friend profiles
+                </button>
+              )}
+            </div>
           </div>
         )}
       </section>
@@ -967,50 +1556,6 @@ function LiveSession({
   );
 }
 
-type PlayerStat = {
-  id: string;
-  name: string;
-  animal: string;
-  games: number;
-  wins: number;
-  rate: number;
-  points: number;
-  streak: number;
-  favourite: string;
-  scores: number[];
-};
-function playerStats(players: Player[], sessions: PastSession[]): PlayerStat[] {
-  return players
-    .map((p) => {
-      const rows = sessions.flatMap((s) => {
-        const r = s.results.find((x) => x.playerId === p.id);
-        return r ? [{ gameName: s.gameName, score: r.score, rank: r.rank }] : [];
-      });
-      const wins = rows.filter((r) => r.rank === 1).length;
-      let streak = 0;
-      for (const r of rows) {
-        if (r.rank === 1) streak++;
-        else break;
-      }
-      const counts = rows.reduce<Record<string, number>>(
-        (acc, r) => ({ ...acc, [r.gameName]: (acc[r.gameName] ?? 0) + 1 }),
-        {},
-      );
-      return {
-        id: p.id,
-        name: p.display_name,
-        animal: p.spirit_animal,
-        games: rows.length,
-        wins,
-        rate: rows.length ? Math.round((wins / rows.length) * 100) : 0,
-        points: rows.reduce((sum, r) => sum + r.score, 0),
-        streak,
-        favourite: Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "—",
-        scores: [...rows].reverse().map((r) => r.score),
-      };
-    })
-    .sort((a, b) => b.wins - a.wins || b.points - a.points || a.name.localeCompare(b.name));
-}
 function EmptyStats({ label }: { label: string }) {
   return (
     <div className="mt-6 rounded-[1.5rem] border border-dashed border-muted-foreground bg-card p-8 text-center">
