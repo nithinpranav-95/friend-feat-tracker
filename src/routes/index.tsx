@@ -1871,7 +1871,7 @@ function StatsView({ players, sessions }: { players: Player[]; sessions: PastSes
                   tick={{ fontSize: 12 }}
                   tickLine={false}
                   domain={metric === "rate" ? [0, 100] : [0, "auto"]}
-                  tickFormatter={metric === "rate" ? (v) => `${v}%` : undefined}
+                  tickFormatter={(v) => (metric === "rate" ? `${v}%` : `${v}`)}
                   allowDecimals={false}
                 />
                 <Tooltip content={<CustomStatsTooltip />} />
@@ -1913,7 +1913,7 @@ function StatsView({ players, sessions }: { players: Player[]; sessions: PastSes
                   type="number"
                   stroke="var(--muted-foreground)"
                   domain={metric === "rate" ? [0, 100] : [0, "auto"]}
-                  tickFormatter={metric === "rate" ? (v) => `${v}%` : undefined}
+                  tickFormatter={(v) => (metric === "rate" ? `${v}%` : `${v}`)}
                   allowDecimals={false}
                   tickLine={false}
                 />
