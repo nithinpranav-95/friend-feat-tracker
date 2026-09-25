@@ -295,14 +295,18 @@ function GameApp() {
     setSetupGame(game);
   }
 
-  function handleAddPlayer(name: string, animal: string, quote?: string) {
+  async function handleAddPlayer(name: string, animal: string, quote?: string) {
     const defaultQuote = spiritAnimals[animal]?.defaultQuote || "Bold & fearless";
-    const newP: Player = {
-      id: crypto.randomUUID(),
-      display_name: name,
-      spirit_animal: animal,
-      quote: quote?.trim() || defaultQuote,
-    };
+    const finalQuote = quote?.trim() || defaultQuote;
+    const { data, error } = await supabase
+      .from("players")
+      .insert({ name, spirit_animal: animal, quote: finalQuote })
+      .select()
+      .single();
+    const newP: Player = data
+      ? { id: data.id, display_name: data.name, spirit_animal: data.spirit_animal, quote: data.quote ?? undefined }
+      : { id: crypto.randomUUID(), display_name: name, spirit_animal: animal, quote: finalQuote };
+    if (error) console.debug("Failed to save player:", error);
     setPlayers((prev) => [...prev, newP]);
     setAddPlayer(false);
     if (pendingGame) {
@@ -311,15 +315,22 @@ function GameApp() {
     }
   }
 
-  function handleUpdatePlayer(updated: Player) {
+  async function handleUpdatePlayer(updated: Player) {
     setPlayers((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
     setEditingPlayer(null);
+    const { error } = await supabase
+      .from("players")
+      .update({ name: updated.display_name, spirit_animal: updated.spirit_animal, quote: updated.quote ?? null })
+      .eq("id", updated.id);
+    if (error) console.debug("Failed to update player:", error);
   }
 
-  function handleDeletePlayer(id: string) {
+  async function handleDeletePlayer(id: string) {
     setPlayers((prev) => prev.filter((p) => p.id !== id));
     setEditingPlayer(null);
     if (profileId === id) setProfileId(null);
+    const { error } = await supabase.from("players").delete().eq("id", id);
+    if (error) console.debug("Failed to delete player:", error);
   }
 
   function startSessionWithPlayers(game: Game, selectedPlayers: Player[]) {
