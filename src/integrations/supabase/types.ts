@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      game_results: {
+        Row: {
+          created_at: string
+          game_name: string
+          id: string
+          played_at: string
+          results: Json
+          rounds: number
+        }
+        Insert: {
+          created_at?: string
+          game_name: string
+          id?: string
+          played_at?: string
+          results?: Json
+          rounds?: number
+        }
+        Update: {
+          created_at?: string
+          game_name?: string
+          id?: string
+          played_at?: string
+          results?: Json
+          rounds?: number
+        }
+        Relationships: []
+      }
       game_sessions: {
         Row: {
           created_at: string
@@ -159,6 +186,27 @@ export type Database = {
           invite_code?: string
           name?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      players: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          spirit_animal: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          spirit_animal?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          spirit_animal?: string
         }
         Relationships: []
       }
