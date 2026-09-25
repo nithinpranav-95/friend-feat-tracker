@@ -162,14 +162,6 @@ const animals: Record<string, string> = Object.fromEntries(
   Object.entries(spiritAnimals).map(([k, v]) => [k, v.emoji]),
 );
 const demoPlayers: Player[] = [];
-const sampleSquad: Player[] = [
-  { id: "jordan", display_name: "Jordan", spirit_animal: "lion", quote: "Bold & fearless" },
-  { id: "alex", display_name: "Alex", spirit_animal: "fox", quote: "Tactical & cunning" },
-  { id: "sam", display_name: "Sam", spirit_animal: "panda", quote: "Calm under pressure" },
-  { id: "taylor", display_name: "Taylor", spirit_animal: "owl", quote: "Master strategist" },
-  { id: "morgan", display_name: "Morgan", spirit_animal: "dragon", quote: "High stakes legend" },
-  { id: "riley", display_name: "Riley", spirit_animal: "chameleon", quote: "Adapts to any game" },
-];
 const demoGames: Game[] = [
   { id: "sevens", name: "Sevens", scoring_type: "points", high_score_wins: false, accent: "lime" },
   { id: "poker", name: "Poker", scoring_type: "points", high_score_wins: true, accent: "yellow" },
@@ -432,21 +424,6 @@ function GameApp() {
     }
   }, [sessions, hydrated]);
 
-  async function handleLoadSampleSquad() {
-    setPlayers(sampleSquad);
-    try {
-      localStorage.setItem("scoreup_players", JSON.stringify(sampleSquad));
-      for (const p of sampleSquad) {
-        await supabase.from("players").insert({
-          name: p.display_name,
-          spirit_animal: p.spirit_animal,
-          quote: p.quote ?? null,
-        });
-      }
-    } catch (e) {
-      console.debug("Failed to seed sample squad:", e);
-    }
-  }
   function handleSelectGame(game: Game) {
     if (players.length === 0) {
       setPendingGame(game);
@@ -580,9 +557,19 @@ function GameApp() {
     );
   const openProfile = players.find((p) => p.id === profileId);
   return (
-    <div className="min-h-screen bg-background pb-24 text-foreground">
+    <div className="relative min-h-screen bg-background pb-24 text-foreground">
+      {tab === "play" && (
+        <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+          <img
+            src="/squad-bg.jpg"
+            alt="Squad background"
+            className="size-full object-cover object-top opacity-30 filter saturate-75 contrast-125"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/85 to-background" />
+        </div>
+      )}
       {celebrate && <Confetti />}
-      <header className="border-b border-border">
+      <header className="relative z-20 border-b border-border/80 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 md:px-7">
           <button
             type="button"
@@ -631,7 +618,7 @@ function GameApp() {
           </button>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-8 md:px-7">
+      <main className="relative z-10 mx-auto max-w-6xl px-4 py-8 md:px-7">
         {tab === "play" && (
           <PlayView
             games={games}
@@ -641,7 +628,6 @@ function GameApp() {
             openPlayer={setProfileId}
             openAddPlayer={() => setAddPlayer(true)}
             goToPlayers={() => setTab("players")}
-            onLoadSampleSquad={handleLoadSampleSquad}
           />
         )}
         {tab === "players" && (
@@ -651,7 +637,6 @@ function GameApp() {
             openPlayer={setProfileId}
             openEditPlayer={(p) => setEditingPlayer(p)}
             openAddPlayer={() => setAddPlayer(true)}
-            onLoadSampleSquad={handleLoadSampleSquad}
           />
         )}
         {tab === "ranks" && (
@@ -1095,14 +1080,12 @@ function PlayersView({
   openPlayer,
   openEditPlayer,
   openAddPlayer,
-  onLoadSampleSquad,
 }: {
   players: Player[];
   sessions: PastSession[];
   openPlayer: (id: string) => void;
   openEditPlayer: (player: Player) => void;
   openAddPlayer: () => void;
-  onLoadSampleSquad?: () => void;
 }) {
   const statsMap = new Map<string, PlayerStat>();
   playerStats(players, sessions).forEach((s) => statsMap.set(s.id, s));
@@ -1126,16 +1109,6 @@ function PlayersView({
           </div>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          {players.length === 0 && onLoadSampleSquad && (
-            <button
-              type="button"
-              onClick={onLoadSampleSquad}
-              className="inline-flex items-center justify-center gap-1.5 rounded-full border border-border bg-secondary px-4 py-2 text-xs font-bold text-foreground transition hover:border-primary hover:text-primary"
-            >
-              <span>🦁</span>
-              <span>Load Mockup Squad</span>
-            </button>
-          )}
           <button
             type="button"
             onClick={openAddPlayer}
@@ -1166,16 +1139,6 @@ function PlayersView({
               <UserPlus className="size-4" />
               <span>Add Your First Friend</span>
             </button>
-            {onLoadSampleSquad && (
-              <button
-                type="button"
-                onClick={onLoadSampleSquad}
-                className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-6 py-3 font-bold text-foreground transition hover:bg-primary/20 hover:text-primary"
-              >
-                <span>🦁</span>
-                <span>Load Sample Squad ({sampleSquad.length} friends)</span>
-              </button>
-            )}
           </div>
         </div>
       ) : (
@@ -1297,7 +1260,6 @@ function PlayView({
   openPlayer,
   openAddPlayer,
   goToPlayers,
-  onLoadSampleSquad,
 }: {
   games: Game[];
   players: Player[];
@@ -1306,7 +1268,6 @@ function PlayView({
   openPlayer: (id: string) => void;
   openAddPlayer: () => void;
   goToPlayers?: () => void;
-  onLoadSampleSquad?: () => void;
 }) {
   return (
     <>
@@ -1376,15 +1337,6 @@ function PlayView({
               >
                 <Plus className="mr-1.5 size-4" /> Add your first player
               </Button>
-              {onLoadSampleSquad && (
-                <Button
-                  onClick={onLoadSampleSquad}
-                  variant="secondary"
-                  className="h-12 rounded-xl border border-border px-6 font-bold text-foreground hover:bg-primary/20 hover:text-primary"
-                >
-                  🦁 Load sample squad (6 friends)
-                </Button>
-              )}
             </div>
           </div>
         ) : (
