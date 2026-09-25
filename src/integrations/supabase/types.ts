@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      custom_games: {
+        Row: {
+          accent: string
+          created_at: string
+          high_score_wins: boolean
+          id: string
+          name: string
+          scoring_type: string
+        }
+        Insert: {
+          accent?: string
+          created_at?: string
+          high_score_wins?: boolean
+          id?: string
+          name: string
+          scoring_type?: string
+        }
+        Update: {
+          accent?: string
+          created_at?: string
+          high_score_wins?: boolean
+          id?: string
+          name?: string
+          scoring_type?: string
+        }
+        Relationships: []
+      }
+      game_results: {
+        Row: {
+          created_at: string
+          game_name: string
+          id: string
+          played_at: string
+          results: Json
+          rounds: number
+        }
+        Insert: {
+          created_at?: string
+          game_name: string
+          id?: string
+          played_at?: string
+          results?: Json
+          rounds?: number
+        }
+        Update: {
+          created_at?: string
+          game_name?: string
+          id?: string
+          played_at?: string
+          results?: Json
+          rounds?: number
+        }
+        Relationships: []
+      }
       game_sessions: {
         Row: {
           created_at: string
@@ -159,6 +213,30 @@ export type Database = {
           invite_code?: string
           name?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      players: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          quote: string | null
+          spirit_animal: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          quote?: string | null
+          spirit_animal?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          quote?: string | null
+          spirit_animal?: string
         }
         Relationships: []
       }

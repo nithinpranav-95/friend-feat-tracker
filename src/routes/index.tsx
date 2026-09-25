@@ -31,6 +31,7 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -64,7 +65,7 @@ type Player = {
   id: string;
   display_name: string;
   spirit_animal: string;
-  quote?: string;
+  quote?: string | undefined;
 };
 type LivePlayer = Player & { score: number };
 type PastSession = {
@@ -243,39 +244,102 @@ function GameApp() {
 
   const [hydrated, setHydrated] = useState(false);
 
-  // Hydrate from localStorage safely on client
+  // Load shared data from cloud DB on mount, with automatic local storage migration and recovery
   useEffect(() => {
-    try {
-      let loadedPlayers: Player[] = [];
-      const savedPlayers = localStorage.getItem("scoreup_players");
-      if (savedPlayers) {
-        const parsed = JSON.parse(savedPlayers);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          loadedPlayers = parsed;
-          setPlayers(parsed);
+    let cancelled = false;
+    (async () => {
+      let cloudPlayers: Player[] = [];
+      let cloudGames: Game[] = [];
+      let cloudSessions: PastSession[] = [];
+
+      try {
+        const [playersRes, gamesRes, resultsRes] = await Promise.all([
+          supabase.from("players").select("*").order("created_at"),
+          supabase.from("custom_games").select("*").order("created_at"),
+          supabase.from("game_results").select("*").order("played_at", { ascending: false }),
+        ]);
+
+        if (playersRes.data && playersRes.data.length > 0) {
+          cloudPlayers = playersRes.data.map((r) => ({
+            id: r.id,
+            display_name: r.name,
+            spirit_animal: r.spirit_animal,
+            quote: r.quote ?? undefined,
+          }));
+        }
+
+        if (gamesRes.data && gamesRes.data.length > 0) {
+          cloudGames = gamesRes.data.map((g) => ({
+            id: g.id,
+            name: g.name,
+            scoring_type: g.scoring_type,
+            high_score_wins: g.high_score_wins,
+            accent: g.accent,
+          }));
+        }
+
+        if (resultsRes.data && resultsRes.data.length > 0) {
+          cloudSessions = resultsRes.data.map((r) => ({
+            id: r.id,
+            gameName: r.game_name,
+            date: new Date(r.played_at).toLocaleDateString(undefined, {
+              day: "numeric",
+              month: "short",
+            }),
+            rounds: r.rounds,
+            results: (r.results as PastSession["results"]) ?? [],
+          }));
+        }
+      } catch (err) {
+        console.debug("Cloud fetch failed, falling back to local storage:", err);
+      }
+
+      if (cancelled) return;
+
+      // Check localStorage for previously added players to migrate or restore
+      let finalPlayers = cloudPlayers;
+      if (finalPlayers.length === 0) {
+        try {
+          const savedLocal = localStorage.getItem("scoreup_players");
+          if (savedLocal) {
+            const parsed = JSON.parse(savedLocal);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              finalPlayers = parsed;
+              // Migrate local players to cloud DB in background
+              parsed.forEach(async (p: Player) => {
+                await supabase.from("players").insert({
+                  name: p.display_name,
+                  spirit_animal: p.spirit_animal,
+                  quote: p.quote ?? null,
+                });
+              });
+            }
+          }
+        } catch (e) {
+          console.debug("Failed to read local players:", e);
         }
       }
 
-      const savedGames = localStorage.getItem("scoreup_games");
-      if (savedGames) {
-        const parsed = JSON.parse(savedGames);
-        if (Array.isArray(parsed) && parsed.length > 0) setGames(parsed);
-      }
-
-      let loadedSessions: PastSession[] = [];
-      const savedSessions = localStorage.getItem("scoreup_sessions");
-      if (savedSessions) {
-        const parsed = JSON.parse(savedSessions);
-        if (Array.isArray(parsed)) {
-          loadedSessions = parsed;
-          setSessions(parsed);
+      // Check localStorage for sessions
+      let finalSessions = cloudSessions;
+      if (finalSessions.length === 0) {
+        try {
+          const savedSessions = localStorage.getItem("scoreup_sessions");
+          if (savedSessions) {
+            const parsed = JSON.parse(savedSessions);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              finalSessions = parsed;
+            }
+          }
+        } catch (e) {
+          console.debug("Failed to read local sessions:", e);
         }
       }
 
-      // Recovery: If players list is empty but past session records exist, recover players!
-      if (loadedPlayers.length === 0 && loadedSessions.length > 0) {
+      // Recovery: If players list is still empty but session records exist, recover players from match history!
+      if (finalPlayers.length === 0 && finalSessions.length > 0) {
         const recovered = new Map<string, Player>();
-        loadedSessions.forEach((s) => {
+        finalSessions.forEach((s) => {
           s.results.forEach((r) => {
             if (r.name && !recovered.has(r.name.trim().toLowerCase())) {
               recovered.set(r.name.trim().toLowerCase(), {
@@ -288,23 +352,65 @@ function GameApp() {
           });
         });
         if (recovered.size > 0) {
-          const recoveredList = Array.from(recovered.values());
-          setPlayers(recoveredList);
+          finalPlayers = Array.from(recovered.values());
+          // Sync recovered players to cloud
+          finalPlayers.forEach(async (p) => {
+            await supabase.from("players").insert({
+              name: p.display_name,
+              spirit_animal: p.spirit_animal,
+              quote: p.quote ?? null,
+            });
+          });
         }
       }
-    } catch (e) {
-      console.debug("Failed to load local storage state:", e);
-    } finally {
+
+      if (finalPlayers.length > 0) {
+        setPlayers(finalPlayers);
+        try {
+          localStorage.setItem("scoreup_players", JSON.stringify(finalPlayers));
+        } catch (e) {
+          console.debug(e);
+        }
+      }
+
+      if (cloudGames.length > 0) {
+        setGames([...demoGames, ...cloudGames]);
+      } else {
+        try {
+          const savedGames = localStorage.getItem("scoreup_games");
+          if (savedGames) {
+            const parsed = JSON.parse(savedGames);
+            if (Array.isArray(parsed) && parsed.length > 0) setGames(parsed);
+          }
+        } catch (e) {
+          console.debug(e);
+        }
+      }
+
+      if (finalSessions.length > 0) {
+        setSessions(finalSessions);
+        try {
+          localStorage.setItem("scoreup_sessions", JSON.stringify(finalSessions));
+        } catch (e) {
+          console.debug(e);
+        }
+      }
+
       setHydrated(true);
-    }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  // Keep local backup up to date
   useEffect(() => {
     if (!hydrated) return;
     try {
       localStorage.setItem("scoreup_players", JSON.stringify(players));
     } catch (e) {
-      console.debug("Failed to save players to local storage:", e);
+      console.debug(e);
     }
   }, [players, hydrated]);
 
@@ -313,7 +419,7 @@ function GameApp() {
     try {
       localStorage.setItem("scoreup_games", JSON.stringify(games));
     } catch (e) {
-      console.debug("Failed to save games to local storage:", e);
+      console.debug(e);
     }
   }, [games, hydrated]);
 
@@ -322,14 +428,25 @@ function GameApp() {
     try {
       localStorage.setItem("scoreup_sessions", JSON.stringify(sessions));
     } catch (e) {
-      console.debug("Failed to save sessions to local storage:", e);
+      console.debug(e);
     }
   }, [sessions, hydrated]);
 
-  function handleLoadSampleSquad() {
+  async function handleLoadSampleSquad() {
     setPlayers(sampleSquad);
+    try {
+      localStorage.setItem("scoreup_players", JSON.stringify(sampleSquad));
+      for (const p of sampleSquad) {
+        await supabase.from("players").insert({
+          name: p.display_name,
+          spirit_animal: p.spirit_animal,
+          quote: p.quote ?? null,
+        });
+      }
+    } catch (e) {
+      console.debug("Failed to seed sample squad:", e);
+    }
   }
-
   function handleSelectGame(game: Game) {
     if (players.length === 0) {
       setPendingGame(game);
@@ -339,14 +456,23 @@ function GameApp() {
     setSetupGame(game);
   }
 
-  function handleAddPlayer(name: string, animal: string, quote?: string) {
+  async function handleAddPlayer(name: string, animal: string, quote?: string) {
     const defaultQuote = spiritAnimals[animal]?.defaultQuote || "Bold & fearless";
-    const newP: Player = {
-      id: crypto.randomUUID(),
-      display_name: name,
-      spirit_animal: animal,
-      quote: quote?.trim() || defaultQuote,
-    };
+    const finalQuote = quote?.trim() || defaultQuote;
+    const { data, error } = await supabase
+      .from("players")
+      .insert({ name, spirit_animal: animal, quote: finalQuote })
+      .select()
+      .single();
+    const newP: Player = data
+      ? {
+          id: data.id,
+          display_name: data.name,
+          spirit_animal: data.spirit_animal,
+          quote: data.quote ?? undefined,
+        }
+      : { id: crypto.randomUUID(), display_name: name, spirit_animal: animal, quote: finalQuote };
+    if (error) console.debug("Failed to save player:", error);
     setPlayers((prev) => [...prev, newP]);
     setAddPlayer(false);
     if (pendingGame) {
@@ -355,15 +481,26 @@ function GameApp() {
     }
   }
 
-  function handleUpdatePlayer(updated: Player) {
+  async function handleUpdatePlayer(updated: Player) {
     setPlayers((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
     setEditingPlayer(null);
+    const { error } = await supabase
+      .from("players")
+      .update({
+        name: updated.display_name,
+        spirit_animal: updated.spirit_animal,
+        quote: updated.quote ?? null,
+      })
+      .eq("id", updated.id);
+    if (error) console.debug("Failed to update player:", error);
   }
 
-  function handleDeletePlayer(id: string) {
+  async function handleDeletePlayer(id: string) {
     setPlayers((prev) => prev.filter((p) => p.id !== id));
     setEditingPlayer(null);
     if (profileId === id) setProfileId(null);
+    const { error } = await supabase.from("players").delete().eq("id", id);
+    if (error) console.debug("Failed to delete player:", error);
   }
 
   function startSessionWithPlayers(game: Game, selectedPlayers: Player[]) {
@@ -391,21 +528,28 @@ function GameApp() {
       const ordered = [...livePlayers].sort((a, b) =>
         liveGame.high_score_wins ? b.score - a.score : a.score - b.score,
       );
-      setSessions((list) => [
-        {
-          id: crypto.randomUUID(),
-          gameName: liveGame.name,
-          date: new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" }),
-          rounds: round,
-          results: ordered.map((p, i) => ({
-            playerId: p.id,
-            name: p.display_name,
-            score: p.score,
-            rank: i + 1,
-          })),
-        },
-        ...list,
-      ]);
+      const results = ordered.map((p, i) => ({
+        playerId: p.id,
+        name: p.display_name,
+        score: p.score,
+        rank: i + 1,
+      }));
+      const now = new Date();
+      const session: PastSession = {
+        id: crypto.randomUUID(),
+        gameName: liveGame.name,
+        date: now.toLocaleDateString(undefined, { day: "numeric", month: "short" }),
+        rounds: round,
+        results,
+      };
+      const { data, error } = await supabase
+        .from("game_results")
+        .insert({ game_name: liveGame.name, rounds: round, results })
+        .select()
+        .single();
+      if (error) console.debug("Failed to save game result:", error);
+      if (data) session.id = data.id;
+      setSessions((list) => [session, ...list]);
     }
     playVictory();
     setCelebrate(true);
@@ -544,11 +688,17 @@ function GameApp() {
       {newGame && (
         <NewGameModal
           close={() => setNewGame(false)}
-          save={(name: string, type: string) => {
+          save={async (name: string, type: string) => {
+            const { data, error } = await supabase
+              .from("custom_games")
+              .insert({ name, scoring_type: type, high_score_wins: true, accent: "lime" })
+              .select()
+              .single();
+            if (error) console.debug("Failed to save game:", error);
             setGames([
               ...games,
               {
-                id: crypto.randomUUID(),
+                id: data?.id ?? crypto.randomUUID(),
                 name,
                 scoring_type: type,
                 high_score_wins: true,
@@ -862,7 +1012,7 @@ function AddPlayerModal({
 }) {
   const [name, setName] = useState("");
   const [animal, setAnimal] = useState("lion");
-  const [quote, setQuote] = useState(spiritAnimals.lion.defaultQuote);
+  const [quote, setQuote] = useState(spiritAnimals["lion"]?.defaultQuote ?? "Bold & fearless");
 
   function handleSelectAnimal(key: string) {
     setAnimal(key);
@@ -1552,7 +1702,7 @@ function LiveSession({
           </div>
           <div className="text-right">
             <span className="animal-bob inline-block text-3xl">
-              {animals[sorted[0]?.spirit_animal]}
+              {animals[sorted[0]?.spirit_animal ?? ""]}
             </span>
             <p className="text-3xl font-black tabular-nums">{sorted[0]?.score}</p>
           </div>
@@ -1932,7 +2082,7 @@ function StatsView({ players, sessions }: { players: Player[]; sessions: PastSes
                   tick={{ fontSize: 12 }}
                   tickLine={false}
                   domain={metric === "rate" ? [0, 100] : [0, "auto"]}
-                  tickFormatter={metric === "rate" ? (v) => `${v}%` : undefined}
+                  tickFormatter={(v) => (metric === "rate" ? `${v}%` : `${v}`)}
                   allowDecimals={false}
                 />
                 <Tooltip content={<CustomStatsTooltip />} />
@@ -1974,7 +2124,7 @@ function StatsView({ players, sessions }: { players: Player[]; sessions: PastSes
                   type="number"
                   stroke="var(--muted-foreground)"
                   domain={metric === "rate" ? [0, 100] : [0, "auto"]}
-                  tickFormatter={metric === "rate" ? (v) => `${v}%` : undefined}
+                  tickFormatter={(v) => (metric === "rate" ? `${v}%` : `${v}`)}
                   allowDecimals={false}
                   tickLine={false}
                 />
@@ -2022,7 +2172,8 @@ function CustomStatsTooltip({
   payload?: Array<{ payload: PlayerStat & { value: number; displayLabel: string } }>;
 }) {
   if (!active || !payload || !payload.length) return null;
-  const data = payload[0].payload;
+  const data = payload[0]?.payload;
+  if (!data) return null;
   return (
     <div className="rounded-2xl border border-border bg-card/95 p-3.5 shadow-xl backdrop-blur-sm">
       <div className="flex items-center gap-2">
