@@ -447,3 +447,138 @@ export function useAuth() {
 
   return { user, loading, signOut };
 }
+
+export function hasPassword({
+  playerName,
+  rawQuote,
+}: {
+  playerId?: string;
+  playerName?: string;
+  rawQuote?: string | null;
+}): boolean {
+  if (rawQuote) {
+    const parsed = parseQuoteAuth(rawQuote);
+    if (parsed.auth) return true;
+  }
+  if (playerName) {
+    const localAccounts = getLocalAccounts();
+    const match = localAccounts.find(
+      (a) => a.name.toLowerCase() === playerName.trim().toLowerCase(),
+    );
+    if (match?.passwordHash) return true;
+  }
+  return false;
+}
+
+export async function changePlayerPassword({
+  playerId,
+  playerName,
+  currentPassword,
+  newPassword,
+}: {
+  playerId?: string;
+  playerName?: string;
+  currentPassword?: string;
+  newPassword: string;
+}): Promise<{ success: boolean; message: string }> {
+  if (newPassword.length < 4) {
+    throw new Error("New password must be at least 4 characters");
+  }
+
+  // Find player record in Supabase or local accounts
+  let targetPlayer: {
+    id: string;
+    name: string;
+    quote: string | null;
+    spirit_animal: string;
+  } | null = null;
+
+  try {
+    if (playerId) {
+      const { data } = await supabase.from("players").select("*").eq("id", playerId).single();
+      if (data) targetPlayer = data;
+    }
+    if (!targetPlayer && playerName) {
+      const { data } = await supabase.from("players").select("*").ilike("name", playerName.trim());
+      if (data && data.length > 0) targetPlayer = data[0];
+    }
+  } catch (e) {
+    console.debug("Supabase lookup error during password change:", e);
+  }
+
+  // Also check local account cache
+  const localAccounts = getLocalAccounts();
+  const localMatch = localAccounts.find(
+    (a) =>
+      (playerId && a.id === playerId) ||
+      (playerName && a.name.toLowerCase() === playerName.trim().toLowerCase()),
+  );
+
+  const rawQuote = targetPlayer?.quote || localMatch?.quote || "";
+  const parsed = parseQuoteAuth(rawQuote);
+
+  // If player already has a password, verify current password
+  const existingSalt = parsed.auth?.salt || localMatch?.salt;
+  const existingHash = parsed.auth?.hash || localMatch?.passwordHash;
+
+  if (existingSalt && existingHash) {
+    if (!currentPassword) {
+      throw new Error("Please enter your current password to authorize this change");
+    }
+    const computedCurrent = await hashPassword(currentPassword, existingSalt);
+    if (computedCurrent !== existingHash) {
+      throw new Error("Current password is incorrect");
+    }
+    if (currentPassword === newPassword) {
+      throw new Error("New password must be different from current password");
+    }
+  }
+
+  // Hash the new password
+  const newSalt = generateSalt();
+  const newHash = await hashPassword(newPassword, newSalt);
+  const clean = parsed.clean || cleanQuote(rawQuote) || "Game night ready";
+  const updatedQuote = encodeQuoteAuth(clean, newSalt, newHash);
+
+  const effectiveId = targetPlayer?.id || localMatch?.id || playerId || crypto.randomUUID();
+  const effectiveName = targetPlayer?.name || localMatch?.name || playerName || "Player";
+  const effectiveAnimal = targetPlayer?.spirit_animal || localMatch?.spirit_animal || "fox";
+
+  // Update in Supabase
+  try {
+    if (targetPlayer?.id) {
+      await supabase.from("players").update({ quote: updatedQuote }).eq("id", targetPlayer.id);
+    }
+  } catch (e) {
+    console.debug("Supabase update error during password change:", e);
+  }
+
+  // Update in local accounts cache
+  saveLocalAccount({
+    id: effectiveId,
+    name: effectiveName,
+    spirit_animal: effectiveAnimal,
+    quote: clean,
+    salt: newSalt,
+    passwordHash: newHash,
+    createdAt: new Date().toISOString(),
+  });
+
+  // If the player whose password was changed is currently logged in, update session
+  const currentUser = getCurrentUser();
+  if (
+    currentUser &&
+    (currentUser.id === effectiveId ||
+      currentUser.name.toLowerCase() === effectiveName.toLowerCase())
+  ) {
+    setCurrentUser({
+      ...currentUser,
+      id: effectiveId,
+      name: effectiveName,
+      spirit_animal: effectiveAnimal,
+      quote: clean,
+    });
+  }
+
+  return { success: true, message: "Password updated successfully!" };
+}

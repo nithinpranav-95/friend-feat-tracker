@@ -6,6 +6,7 @@ import {
   Eye,
   EyeOff,
   Gamepad2,
+  KeyRound,
   Lock,
   LogIn,
   Sparkles,
@@ -13,6 +14,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ChangePasswordModal } from "@/components/ChangePasswordModal";
 import {
   signInWithNameAndPassword,
   signUpWithNameAndPassword,
@@ -48,6 +50,7 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   function handleSelectAnimal(key: string) {
     setAnimal(key);
@@ -178,16 +181,30 @@ function AuthPage() {
                   <Gamepad2 className="mr-2 size-4" /> Go to Game Dashboard
                 </Button>
                 <Button
+                  onClick={() => setShowChangePassword(true)}
+                  variant="outline"
+                  className="h-12 rounded-xl border-border font-bold text-foreground hover:bg-secondary"
+                >
+                  <KeyRound className="mr-2 size-4 text-primary" /> Change Password
+                </Button>
+                <Button
                   onClick={() => {
                     signOut();
                     setSuccess("Signed out successfully.");
                   }}
-                  variant="outline"
-                  className="h-12 rounded-xl border-border font-bold text-foreground hover:bg-secondary"
+                  variant="ghost"
+                  className="h-11 rounded-xl text-xs font-bold text-muted-foreground hover:text-foreground"
                 >
                   Sign Out / Switch Account
                 </Button>
               </div>
+              {showChangePassword && (
+                <ChangePasswordModal
+                  player={user}
+                  close={() => setShowChangePassword(false)}
+                  onSuccess={() => setSuccess("Password changed successfully!")}
+                />
+              )}
             </div>
           ) : (
             /* Sign In / Sign Up Form */

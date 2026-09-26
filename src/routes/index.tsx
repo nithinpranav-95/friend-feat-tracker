@@ -7,6 +7,7 @@ import {
   CirclePlus,
   Gamepad2,
   History,
+  KeyRound,
   LogIn,
   LogOut,
   Minus,
@@ -34,6 +35,7 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import { ChangePasswordModal } from "@/components/ChangePasswordModal";
 import { supabase } from "@/integrations/supabase/client";
 import {
   useAuth,
@@ -245,6 +247,7 @@ function GameApp() {
   const [sessions, setSessions] = useState<PastSession[]>([]);
   const { user: authUser } = useAuth();
   const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const [changePasswordTarget, setChangePasswordTarget] = useState<Player | null>(null);
 
   const [hydrated, setHydrated] = useState(false);
 
@@ -697,6 +700,22 @@ function GameApp() {
                         type="button"
                         onClick={() => {
                           setShowAccountMenu(false);
+                          setChangePasswordTarget({
+                            id: authUser.id,
+                            display_name: authUser.name,
+                            spirit_animal: authUser.spirit_animal,
+                            quote: authUser.quote,
+                          });
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-foreground transition hover:bg-secondary"
+                      >
+                        <KeyRound className="size-3.5 text-primary" />
+                        <span>Change Password</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAccountMenu(false);
                           authSignOut();
                         }}
                         className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-destructive transition hover:bg-destructive/10"
@@ -812,6 +831,7 @@ function GameApp() {
           close={() => setEditingPlayer(null)}
           save={handleUpdatePlayer}
           remove={handleDeletePlayer}
+          onChangePassword={(p) => setChangePasswordTarget(p)}
         />
       )}
       {openProfile && (
@@ -820,6 +840,18 @@ function GameApp() {
           sessions={sessions}
           close={() => setProfileId(null)}
           onEdit={(p) => setEditingPlayer(p)}
+          onChangePassword={(p) => setChangePasswordTarget(p)}
+        />
+      )}
+      {changePasswordTarget && (
+        <ChangePasswordModal
+          player={{
+            id: changePasswordTarget.id,
+            name: changePasswordTarget.display_name,
+            spirit_animal: changePasswordTarget.spirit_animal,
+            quote: changePasswordTarget.quote,
+          }}
+          close={() => setChangePasswordTarget(null)}
         />
       )}
     </div>
@@ -831,11 +863,13 @@ function ProfileSheet({
   sessions,
   close,
   onEdit,
+  onChangePassword,
 }: {
   player: Player;
   sessions: PastSession[];
   close: () => void;
   onEdit?: (player: Player) => void;
+  onChangePassword?: (player: Player) => void;
 }) {
   const mine = sessions.filter((s) => s.results.some((r) => r.playerId === player.id));
   const rows = mine.map((s) => {
@@ -882,6 +916,20 @@ function ProfileSheet({
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {onChangePassword && (
+              <Button
+                onClick={() => {
+                  close();
+                  onChangePassword(player);
+                }}
+                variant="ghost"
+                size="icon"
+                aria-label="Change password"
+                title="Change password"
+              >
+                <KeyRound className="size-4" />
+              </Button>
+            )}
             {onEdit && (
               <Button
                 onClick={() => {
@@ -965,11 +1013,13 @@ function EditPlayerModal({
   close,
   save,
   remove,
+  onChangePassword,
 }: {
   player: Player;
   close: () => void;
   save: (updated: Player) => void;
   remove: (id: string) => void;
+  onChangePassword?: (player: Player) => void;
 }) {
   const [name, setName] = useState(player.display_name);
   const [animal, setAnimal] = useState(player.spirit_animal);
@@ -1060,6 +1110,30 @@ function EditPlayerModal({
         >
           Save Changes
         </Button>
+
+        {onChangePassword && (
+          <div className="mt-4 border-t border-border pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                close();
+                onChangePassword(player);
+              }}
+              className="flex w-full items-center justify-between rounded-xl border border-border/70 bg-secondary/40 p-3 text-left transition hover:border-primary/50 hover:bg-secondary/70"
+            >
+              <div className="flex items-center gap-2.5">
+                <KeyRound className="size-4 text-primary" />
+                <div>
+                  <p className="text-xs font-bold text-foreground">Profile Password</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Change or set password for {player.display_name}
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs font-bold text-primary">Manage →</span>
+            </button>
+          </div>
+        )}
 
         <div className="mt-4 border-t border-border pt-4">
           {!confirmDelete ? (
