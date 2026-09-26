@@ -253,8 +253,8 @@ export async function signUpWithNameAndPassword({
       .select("id, name, quote, spirit_animal")
       .ilike("name", trimmedName);
 
-    if (data && data.length > 0) {
-      const existing = data[0];
+    const existing = data?.[0];
+    if (existing) {
       const parsed = parseQuoteAuth(existing.quote);
       if (parsed.auth) {
         throw new Error(`An account with the name "${trimmedName}" already exists. Please log in.`);
@@ -366,9 +366,7 @@ export async function signInWithNameAndPassword({
       .select("id, name, quote, spirit_animal")
       .ilike("name", trimmedName);
 
-    if (data && data.length > 0) {
-      cloudPlayer = data[0];
-    }
+    cloudPlayer = data?.[0] ?? null;
   } catch (e) {
     console.debug("Supabase lookup during login error:", e);
   }
