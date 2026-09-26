@@ -142,7 +142,7 @@ export function generateSalt(): string {
  */
 export function cleanQuote(rawQuote?: string | null): string {
   if (!rawQuote) return "";
-  return rawQuote.split("__AUTH__:")[0].trim();
+  return (rawQuote.split("__AUTH__:")[0] ?? "").trim();
 }
 
 export function parseQuoteAuth(rawQuote?: string | null): {
@@ -151,10 +151,10 @@ export function parseQuoteAuth(rawQuote?: string | null): {
 } {
   if (!rawQuote) return { clean: "" };
   const parts = rawQuote.split("__AUTH__:");
-  const clean = parts[0].trim();
+  const clean = (parts[0] ?? "").trim();
   if (parts.length > 1) {
     try {
-      const auth = JSON.parse(parts[1]);
+      const auth = JSON.parse(parts[1] ?? "");
       return { clean, auth };
     } catch {
       return { clean };
@@ -229,7 +229,7 @@ export async function signUpWithNameAndPassword({
   name: string;
   password: string;
   spirit_animal: string;
-  quote?: string;
+  quote?: string | undefined;
 }): Promise<{ user: AuthUser }> {
   const trimmedName = name.trim();
   if (!trimmedName) {
@@ -253,8 +253,8 @@ export async function signUpWithNameAndPassword({
       .select("id, name, quote, spirit_animal")
       .ilike("name", trimmedName);
 
-    if (data && data.length > 0) {
-      const existing = data[0];
+    const existing = data?.[0];
+    if (existing) {
       const parsed = parseQuoteAuth(existing.quote);
       if (parsed.auth) {
         throw new Error(`An account with the name "${trimmedName}" already exists. Please log in.`);
@@ -366,9 +366,7 @@ export async function signInWithNameAndPassword({
       .select("id, name, quote, spirit_animal")
       .ilike("name", trimmedName);
 
-    if (data && data.length > 0) {
-      cloudPlayer = data[0];
-    }
+    cloudPlayer = data?.[0] ?? null;
   } catch (e) {
     console.debug("Supabase lookup during login error:", e);
   }
