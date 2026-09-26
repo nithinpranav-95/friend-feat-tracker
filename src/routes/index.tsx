@@ -41,6 +41,7 @@ import {
   cleanQuote,
   parseQuoteAuth,
   encodeQuoteAuth,
+  type AuthUser,
 } from "@/lib/auth";
 import { AuthPage } from "./auth";
 
@@ -843,6 +844,57 @@ function GameApp() {
         />
       )}
     </div>
+  );
+}
+
+function MyPointsCard({
+  authUser,
+  players,
+  sessions,
+  openProfile,
+}: {
+  authUser: AuthUser;
+  players: Player[];
+  sessions: PastSession[];
+  openProfile: (id: string) => void;
+}) {
+  const stats = playerStats(players, sessions);
+  const mine =
+    stats.find((s) => s.id === authUser.id) ??
+    stats.find((s) => s.name.toLowerCase() === authUser.name.toLowerCase());
+  const matchedPlayer =
+    players.find((p) => p.id === authUser.id) ??
+    players.find((p) => p.display_name.toLowerCase() === authUser.name.toLowerCase());
+  const emoji = spiritAnimals[authUser.spirit_animal]?.emoji || "🦊";
+  const rank = mine ? stats.indexOf(mine) + 1 : null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => matchedPlayer && openProfile(matchedPlayer.id)}
+      className="mb-6 flex w-full items-center gap-4 rounded-[1.5rem] border border-primary/30 bg-gradient-to-r from-primary/15 via-card to-card p-4 text-left shadow-lg transition hover:border-primary/60"
+    >
+      <span className="animal-bob grid size-14 shrink-0 place-items-center rounded-2xl bg-primary/20 text-3xl">
+        {emoji}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-extrabold uppercase tracking-wider text-primary">
+          Welcome back
+        </p>
+        <h2 className="truncate font-heading text-xl font-bold">{authUser.name}</h2>
+        <p className="text-xs text-muted-foreground">
+          {mine ? `${mine.games} games · ${mine.wins} wins` : "No games yet — play your first!"}
+        </p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="font-heading text-3xl font-bold tabular-nums text-primary">
+          {mine?.points ?? 0}
+        </p>
+        <p className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+          points{rank ? ` · #${rank}` : ""}
+        </p>
+      </div>
+    </button>
   );
 }
 
