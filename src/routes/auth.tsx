@@ -133,14 +133,6 @@ export function AuthPage() {
       {/* Top Header */}
       <header className="relative z-20 border-b border-border/80 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 md:px-7">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-bold text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" />
-            <span>Back to Game Board</span>
-          </Link>
-
           <Link to="/" className="flex items-center gap-2 transition hover:opacity-90">
             <span className="grid size-9 place-items-center rounded-xl bg-primary text-lg font-bold text-primary-foreground shadow-md">
               🎲
