@@ -472,11 +472,6 @@ function GameApp() {
   }, [authUser, hydrated]);
 
   function handleSelectGame(game: Game) {
-    if (players.length === 0) {
-      setPendingGame(game);
-      setAddPlayer(true);
-      return;
-    }
     setSetupGame(game);
   }
 
@@ -769,7 +764,6 @@ function GameApp() {
             start={handleSelectGame}
             openNew={() => setNewGame(true)}
             openPlayer={setProfileId}
-            openAddPlayer={() => setAddPlayer(true)}
             goToPlayers={() => setTab("players")}
           />
         )}
@@ -779,7 +773,6 @@ function GameApp() {
             sessions={sessions}
             openPlayer={setProfileId}
             openEditPlayer={(p) => setEditingPlayer(p)}
-            openAddPlayer={() => setAddPlayer(true)}
           />
         )}
         {tab === "ranks" && (
@@ -1263,7 +1256,7 @@ function AddPlayerModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-end bg-background/85 p-4 backdrop-blur-sm sm:place-items-center">
+    <div className="fixed inset-0 z-[60] grid place-items-end bg-background/85 p-4 backdrop-blur-sm sm:place-items-center">
       <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[1.5rem] border border-border bg-card p-6 shadow-2xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -1334,13 +1327,11 @@ function PlayersView({
   sessions,
   openPlayer,
   openEditPlayer,
-  openAddPlayer,
 }: {
   players: Player[];
   sessions: PastSession[];
   openPlayer: (id: string) => void;
   openEditPlayer: (player: Player) => void;
-  openAddPlayer: () => void;
 }) {
   const statsMap = new Map<string, PlayerStat>();
   playerStats(players, sessions).forEach((s) => statsMap.set(s.id, s));
@@ -1363,16 +1354,6 @@ function PlayersView({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={openAddPlayer}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-purple-500/20 transition hover:brightness-110 hover:shadow-purple-500/30 active:scale-95"
-          >
-            <UserPlus className="size-4" />
-            <span>Add Friend</span>
-          </button>
-        </div>
       </div>
 
       {players.length === 0 ? (
@@ -1382,19 +1363,9 @@ function PlayersView({
           </div>
           <h3 className="mt-4 font-heading text-2xl font-bold">No friend profiles yet</h3>
           <p className="mt-1.5 max-w-md text-sm text-muted-foreground">
-            Create profiles with spirit animals, nicknames, and catchphrases. Career stats, win
-            rates, and trophies will accumulate as you play games.
+            Profiles with spirit animals, career stats, win rates, and trophies will accumulate as
+            you play games. Select any game to start playing and add players.
           </p>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={openAddPlayer}
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600 px-6 py-3 font-bold text-white shadow-lg shadow-purple-500/20 hover:brightness-110"
-            >
-              <UserPlus className="size-4" />
-              <span>Add Your First Friend</span>
-            </button>
-          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -1513,7 +1484,6 @@ function PlayView({
   start,
   openNew,
   openPlayer,
-  openAddPlayer,
   goToPlayers,
 }: {
   games: Game[];
@@ -1521,7 +1491,6 @@ function PlayView({
   start: (g: Game) => void;
   openNew: () => void;
   openPlayer: (id: string) => void;
-  openAddPlayer: () => void;
   goToPlayers?: () => void;
 }) {
   return (
@@ -1560,22 +1529,13 @@ function PlayView({
         </div>
       </section>
       <section className="mt-10">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="font-heading text-3xl font-bold">The squad</h2>
-            <p className="text-sm text-muted-foreground">
-              {players.length === 0
-                ? "No players yet — add friends when you're ready to play"
-                : `${players.length} friend${players.length === 1 ? "" : "s"} ready for game night`}
-            </p>
-          </div>
-          <Button
-            onClick={openAddPlayer}
-            variant="outline"
-            className="rounded-xl border-primary/40 font-bold text-primary hover:bg-primary/10"
-          >
-            <Plus className="mr-1.5 size-4" /> Add player
-          </Button>
+        <div>
+          <h2 className="font-heading text-3xl font-bold">The squad</h2>
+          <p className="text-sm text-muted-foreground">
+            {players.length === 0
+              ? "No players yet — select a game above to start and add players"
+              : `${players.length} friend${players.length === 1 ? "" : "s"} ready for game night`}
+          </p>
         </div>
 
         {players.length === 0 ? (
@@ -1583,16 +1543,8 @@ function PlayView({
             <span className="text-4xl">👋</span>
             <h3 className="mt-3 font-heading text-xl font-bold">No players in the squad</h3>
             <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-              Add your friends' names and spirit animals when you are ready to play.
+              Select a game above to start playing and add your squad members.
             </p>
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-              <Button
-                onClick={openAddPlayer}
-                className="h-12 rounded-xl bg-primary px-6 font-bold text-primary-foreground shadow-md hover:brightness-105"
-              >
-                <Plus className="mr-1.5 size-4" /> Add your first player
-              </Button>
-            </div>
           </div>
         ) : (
           <div className="mt-5 space-y-2.5">
@@ -1625,22 +1577,16 @@ function PlayView({
               );
             })}
 
-            <div className="flex flex-col gap-2 pt-1 sm:flex-row">
-              <button
-                onClick={openAddPlayer}
-                className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-dashed border-muted-foreground/30 bg-card/40 p-3.5 text-center font-bold text-primary transition hover:border-primary hover:bg-secondary/60"
-              >
-                <Plus className="size-4" /> Add another player
-              </button>
-              {goToPlayers && (
+            {goToPlayers && (
+              <div className="pt-1">
                 <button
                   onClick={goToPlayers}
-                  className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-secondary/60 px-5 py-3.5 text-center text-xs font-bold text-foreground transition hover:border-primary hover:bg-secondary"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-secondary/60 px-5 py-3.5 text-center text-xs font-bold text-foreground transition hover:border-primary hover:bg-secondary"
                 >
                   <Users className="size-4 text-primary" /> View all friend profiles
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
       </section>
@@ -1749,88 +1695,109 @@ function GameSetupModal({
               {selectedIds.size} selected
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            {players.length > 5 && (
+          {players.length > 0 && (
+            <div className="flex items-center gap-2">
+              {players.length > 5 && (
+                <button
+                  type="button"
+                  onClick={() => selectFirst(5)}
+                  className="rounded-lg bg-secondary px-2.5 py-1 text-xs font-bold text-foreground hover:bg-primary/20 hover:text-primary transition"
+                >
+                  Pick 5
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => selectFirst(5)}
-                className="rounded-lg bg-secondary px-2.5 py-1 text-xs font-bold text-foreground hover:bg-primary/20 hover:text-primary transition"
+                onClick={selectAll}
+                disabled={isAllSelected}
+                className="rounded-lg px-2.5 py-1 text-xs font-bold text-primary hover:bg-primary/10 transition disabled:opacity-40"
               >
-                Pick 5
+                All
               </button>
-            )}
-            <button
-              type="button"
-              onClick={selectAll}
-              disabled={isAllSelected}
-              className="rounded-lg px-2.5 py-1 text-xs font-bold text-primary hover:bg-primary/10 transition disabled:opacity-40"
-            >
-              All
-            </button>
-            <span className="text-muted-foreground/30">|</span>
-            <button
-              type="button"
-              onClick={clearAll}
-              disabled={selectedIds.size === 0}
-              className="rounded-lg px-2.5 py-1 text-xs font-bold text-muted-foreground hover:text-foreground transition disabled:opacity-40"
-            >
-              Clear
-            </button>
-          </div>
+              <span className="text-muted-foreground/30">|</span>
+              <button
+                type="button"
+                onClick={clearAll}
+                disabled={selectedIds.size === 0}
+                className="rounded-lg px-2.5 py-1 text-xs font-bold text-muted-foreground hover:text-foreground transition disabled:opacity-40"
+              >
+                Clear
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="mt-3 flex-1 overflow-y-auto space-y-2 pr-1 max-h-[46vh]">
-          {players.map((p) => {
-            const isSelected = selectedIds.has(p.id);
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => togglePlayer(p.id)}
-                className={`flex w-full items-center justify-between rounded-2xl border p-3.5 text-left transition ${
-                  isSelected
-                    ? "border-primary bg-primary/10 text-foreground shadow-sm"
-                    : "border-border bg-secondary/30 text-muted-foreground hover:border-border hover:bg-secondary/60"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="animal-bob inline-block text-3xl">
-                    {animals[p.spirit_animal] ?? "🦊"}
-                  </span>
-                  <div>
-                    <p
-                      className={`font-heading text-base font-bold ${
-                        isSelected ? "text-foreground" : "text-muted-foreground"
+        {players.length === 0 ? (
+          <div className="my-6 flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-secondary/30 p-8 text-center">
+            <span className="text-3xl">👥</span>
+            <p className="mt-2 font-heading text-lg font-bold">No players in squad yet</p>
+            <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+              Add your friends who are playing {game.name} tonight.
+            </p>
+            <Button
+              type="button"
+              onClick={openAddPlayer}
+              className="mt-4 h-11 rounded-xl bg-primary px-5 font-bold text-primary-foreground shadow hover:brightness-105"
+            >
+              <Plus className="mr-1.5 size-4" /> Add new player
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="mt-3 flex-1 overflow-y-auto space-y-2 pr-1 max-h-[46vh]">
+              {players.map((p) => {
+                const isSelected = selectedIds.has(p.id);
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => togglePlayer(p.id)}
+                    className={`flex w-full items-center justify-between rounded-2xl border p-3.5 text-left transition ${
+                      isSelected
+                        ? "border-primary bg-primary/10 text-foreground shadow-sm"
+                        : "border-border bg-secondary/30 text-muted-foreground hover:border-border hover:bg-secondary/60"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="animal-bob inline-block text-3xl">
+                        {animals[p.spirit_animal] ?? "🦊"}
+                      </span>
+                      <div>
+                        <p
+                          className={`font-heading text-base font-bold ${
+                            isSelected ? "text-foreground" : "text-muted-foreground"
+                          }`}
+                        >
+                          {p.display_name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {isSelected ? "Participating in game" : "Sitting out"}
+                        </p>
+                      </div>
+                    </div>
+                    <span
+                      className={`grid size-7 place-items-center rounded-xl font-bold transition ${
+                        isSelected
+                          ? "bg-primary text-primary-foreground shadow"
+                          : "border border-border bg-card text-transparent"
                       }`}
                     >
-                      {p.display_name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {isSelected ? "Participating in game" : "Sitting out"}
-                    </p>
-                  </div>
-                </div>
-                <span
-                  className={`grid size-7 place-items-center rounded-xl font-bold transition ${
-                    isSelected
-                      ? "bg-primary text-primary-foreground shadow"
-                      : "border border-border bg-card text-transparent"
-                  }`}
-                >
-                  <Check className="size-4 stroke-[3]" />
-                </span>
-              </button>
-            );
-          })}
-        </div>
+                      <Check className="size-4 stroke-[3]" />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
 
-        <button
-          type="button"
-          onClick={openAddPlayer}
-          className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-dashed border-muted-foreground/40 py-2.5 text-xs font-bold text-primary hover:bg-secondary transition"
-        >
-          <Plus className="size-4" /> Add another player to squad
-        </button>
+            <button
+              type="button"
+              onClick={openAddPlayer}
+              className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-dashed border-muted-foreground/40 py-2.5 text-xs font-bold text-primary hover:bg-secondary transition"
+            >
+              <Plus className="size-4" /> Add new player for this game
+            </button>
+          </>
+        )}
 
         <div className="mt-5 border-t border-border pt-4">
           <Button
