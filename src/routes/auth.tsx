@@ -34,7 +34,7 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
-function AuthPage() {
+export function AuthPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -43,7 +43,7 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [animal, setAnimal] = useState("lion");
-  const [quote, setQuote] = useState(spiritAnimals.lion?.defaultQuote || "Bold & fearless");
+  const [quote, setQuote] = useState(spiritAnimals["lion"]?.defaultQuote || "Bold & fearless");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -133,14 +133,6 @@ function AuthPage() {
       {/* Top Header */}
       <header className="relative z-20 border-b border-border/80 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 md:px-7">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-bold text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" />
-            <span>Back to Game Board</span>
-          </Link>
-
           <Link to="/" className="flex items-center gap-2 transition hover:opacity-90">
             <span className="grid size-9 place-items-center rounded-xl bg-primary text-lg font-bold text-primary-foreground shadow-md">
               🎲
