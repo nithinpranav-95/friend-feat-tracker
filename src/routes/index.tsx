@@ -179,6 +179,17 @@ const demoGames: Game[] = [
 ];
 
 function ScoreUp() {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background text-foreground">
+        <p className="animate-pulse font-heading text-xl font-bold text-muted-foreground">
+          Loading game night…
+        </p>
+      </div>
+    );
+  }
+  if (!user) return <AuthPage />;
   return <GameApp />;
 }
 
