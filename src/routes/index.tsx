@@ -42,6 +42,7 @@ import {
   parseQuoteAuth,
   encodeQuoteAuth,
 } from "@/lib/auth";
+import { AuthPage } from "./auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
