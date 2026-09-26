@@ -142,7 +142,7 @@ export function generateSalt(): string {
  */
 export function cleanQuote(rawQuote?: string | null): string {
   if (!rawQuote) return "";
-  return rawQuote.split("__AUTH__:")[0].trim();
+  return (rawQuote.split("__AUTH__:")[0] ?? "").trim();
 }
 
 export function parseQuoteAuth(rawQuote?: string | null): {
