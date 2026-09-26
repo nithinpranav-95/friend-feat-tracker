@@ -734,6 +734,14 @@ function GameApp() {
         </div>
       </header>
       <main className="relative z-10 mx-auto max-w-6xl px-4 py-8 md:px-7">
+        {authUser && tab === "play" && (
+          <MyPointsCard
+            authUser={authUser}
+            players={players}
+            sessions={sessions}
+            openProfile={(id) => setProfileId(id)}
+          />
+        )}
         {tab === "play" && (
           <PlayView
             games={games}
