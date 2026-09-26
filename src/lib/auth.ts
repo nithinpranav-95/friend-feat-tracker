@@ -151,10 +151,10 @@ export function parseQuoteAuth(rawQuote?: string | null): {
 } {
   if (!rawQuote) return { clean: "" };
   const parts = rawQuote.split("__AUTH__:");
-  const clean = parts[0].trim();
+  const clean = (parts[0] ?? "").trim();
   if (parts.length > 1) {
     try {
-      const auth = JSON.parse(parts[1]);
+      const auth = JSON.parse(parts[1] ?? "");
       return { clean, auth };
     } catch {
       return { clean };
@@ -229,7 +229,7 @@ export async function signUpWithNameAndPassword({
   name: string;
   password: string;
   spirit_animal: string;
-  quote?: string;
+  quote?: string | undefined;
 }): Promise<{ user: AuthUser }> {
   const trimmedName = name.trim();
   if (!trimmedName) {

@@ -43,7 +43,7 @@ export function AuthPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [animal, setAnimal] = useState("lion");
-  const [quote, setQuote] = useState(spiritAnimals.lion?.defaultQuote || "Bold & fearless");
+  const [quote, setQuote] = useState(spiritAnimals["lion"]?.defaultQuote || "Bold & fearless");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
